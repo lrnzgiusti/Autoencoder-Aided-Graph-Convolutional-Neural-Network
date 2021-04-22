@@ -1,0 +1,16 @@
+2021/04/14 23:17:27
+
+nNodes = 20
+graphType = SBM
+
+nCommunities = 2
+probIntra = 0.8
+probInter = 0.2
+
+nTrain = 50
+nValid = 1000
+nTest = 50
+tMax = None
+nClasses = 2
+useGPU = False
+

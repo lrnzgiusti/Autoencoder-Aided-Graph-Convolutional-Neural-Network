@@ -1,0 +1,67 @@
+2021/04/21 15:24:49
+
+nNodes = 20
+graphType = SBM
+
+nCommunities = 2
+probIntra = 0.8
+probInter = 0.2
+
+nTrain = 50
+nValid = 1000
+nTest = 50
+tMax = None
+nClasses = 2
+useGPU = False
+
+optimAlg = ADAM
+learningRate = 0.001
+beta1 = 0.9
+lossFunction = <class 'torch.nn.modules.loss.CrossEntropyLoss'>
+nEpochs = 40
+batchSize = 20
+validationInterval = 20
+
+name = AggGNN
+nNodes = 1
+Nmax = None
+order = Degree
+F = [1, 5, 5]
+K = [3, 3]
+bias = True
+sigma = <class 'torch.nn.modules.activation.ReLU'>
+rho = <class 'torch.nn.modules.pooling.MaxPool1d'>
+alpha = [2, 3]
+dimLayersMLP = [2]
+
+name = SelGNN
+F = [1, 5, 5]
+K = [3, 3]
+bias = True
+sigma = <class 'torch.nn.modules.activation.ReLU'>
+rho = <class 'alegnn.utils.graphML.MaxPoolLocal'>
+alpha = [2, 3]
+N = [10, 5]
+order = Degree
+dimLayersMLP = [2]
+
+name = CrsGNN
+F = [1, 5, 5]
+K = [3, 3]
+bias = True
+sigma = <class 'torch.nn.modules.activation.ReLU'>
+rho = <class 'torch.nn.modules.pooling.MaxPool1d'>
+alpha = [2, 3]
+N = [10, 5]
+order = None
+dimLayersMLP = [2]
+
+saveDir = experiments/sourceLocTutorial-SBM-20210421152449
+printInterval = 0
+figSize = 5
+lineWidth = 2
+markerShape = o
+markerSize = 3
+
+sourceNodes = [12, 1]
+
