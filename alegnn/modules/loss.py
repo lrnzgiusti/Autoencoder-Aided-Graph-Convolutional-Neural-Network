@@ -20,6 +20,56 @@ import torch.nn as nn
 # This will be standard procedure for all loss functions that have penalties.
 # Note: The existence of a penalty will be signaled by an attribute in the model
 
+class MultiGraphLearningLoss(nn.modules.loss._Loss):
+    """
+    
+    MultiGraphLearningLoss: wrapper that handles the graph learning tasks
+    
+    It takes into account different metrics on the graph shift:
+        Total_Variation_h: 
+                Trace(Z_h^T S_h Z_h) 
+            It measures the smoothness of the signal Z,
+            at layer h on the shift at layer h.
+            Penalizes un-smooth signals projected onto the graph shift.
+        Frobenius_h:
+                ||S_h||_F^2
+            It prevents the shift to be over-smoothed.
+            Penalizes very low values of the entries of the graph shift.
+        Log_Barrier_h:
+                1^T log(S_h 1) 
+            Prevents the shift to be associated to a disconnected graph.
+            Penalizes a graph shift operator that
+            tend to be associated to a disconnected graph
+    """
+    def __init__(self, lossFunction):
+        pass
+    
+    def frobenius_norm(self, shifts, multipliers):
+        """
+        
+        Computes the frobenius norm 
+        .. math::
+            \sum_{i=1}^{\\infty} x_{i}
+
+        
+        
+        Parameters
+        ----------
+        shifts : TYPE
+            DESCRIPTION.
+        multipliers : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+    
+    def forward(self, estimate, target):
+        pass
+    
+
 class adaptExtraDimensionLoss(nn.modules.loss._Loss):
     """
     adaptExtraDimensionLoss: wrapper that handles extra dimensions
