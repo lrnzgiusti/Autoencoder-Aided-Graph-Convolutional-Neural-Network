@@ -47,25 +47,67 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
     def frobenius_norm(self, shifts, multipliers):
         """
         
-        Computes the frobenius norm 
-        .. math::
-            \sum_{i=1}^{\\infty} x_{i}
-
-        
+        Computes the sum of the frobenous norms of the shift.
+        Every norm at layer h has its own multiplier (lambda_h)
+            
         
         Parameters
         ----------
-        shifts : TYPE
-            DESCRIPTION.
-        multipliers : TYPE
-            DESCRIPTION.
+        shifts : vector or list
+            a vector of the shifts operators:
+                * shifts[h] = S_h.
+        multipliers : vector (torch.tensor)
+            a vector of the multipliers for the frobenius norm:
+                * multipliers[h] = lambda_h
 
         Returns
         -------
-        None.
+        frobenius_penalty : float
+            the sum of all the frobenius norms,
+            scaled by their respective multipliers
 
         """
+        frob_sq = lambda S: torch.norm(S, p='fro')**2 
+        norms = torch.tensor([frob_sq(S) for S in shifts])
+        frobenius_penalty = multipliers @ norms
+        return frobenius_penalty
     
+    def total_variation(self, shifts, signals, multipliers):
+        """
+        
+        Compute, for every layer h,
+        the sum of the total variations of the signals onto the graph shift.
+        
+        It measures the smoothness of the signal Z_h for the shift S_h.
+        
+        Every Total variation has its own multiplier (beta_h)
+
+        Parameters
+        ----------
+        shifts : vector or list of torch.tensor
+            a vector of the shifts operators:
+                * shifts[h] = S_h.
+        signals : vector or list of torch.tensor
+            a vector of the signals from the hidden layers.
+                * signals[h] = Z_h
+        multipliers : vector (torch.tensor)
+            a vector of the multipliers for the frobenius norm:
+                * multipliers[h] = beta_h
+
+        Returns
+        -------
+        total_variation_penalty : float
+            the sum of all the total variations,
+            scaled by their respective multipliers
+
+        """
+        trace = torch.trace
+        traces = torch.tensor([trace( signals[h].T @ shifts[h] @ signals[h])
+                               for h in range(len(signals))])
+        total_variation_penalty = multipliers @ traces
+        return total_variation_penalty
+        
+        
     def forward(self, estimate, target):
         pass
     
