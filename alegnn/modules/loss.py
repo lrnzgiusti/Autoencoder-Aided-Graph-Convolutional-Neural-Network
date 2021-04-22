@@ -11,6 +11,12 @@ F1Score: loss function corresponding to 1 - F1 score
 import torch
 import torch.nn as nn
 
+log = torch.log
+clip = torch.clamp
+trace = torch.trace
+norm = torch.norm
+
+
 # An arbitrary loss function handling penalties needs to have the following
 # conditions
 # .penaltyList attribute listing the names of the penalties
@@ -67,8 +73,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        frob_sq = lambda S: torch.norm(S, p='fro')**2 
-        norms = torch.tensor([frob_sq(S) for S in shifts])
+        norms = torch.tensor([norm(S, p='fro')**2 for S in shifts])
         frobenius_penalty = multipliers @ norms
         return frobenius_penalty
     
@@ -91,7 +96,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             a vector of the signals from the hidden layers.
                 * signals[h] = Z_h
         multipliers : vector (torch.tensor)
-            a vector of the multipliers for the frobenius norm:
+            a vector of the multipliers for the total variation:
                 * multipliers[h] = beta_h
 
         Returns
@@ -101,16 +106,50 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        trace = torch.trace
-        traces = torch.tensor([trace( signals[h].T @ shifts[h] @ signals[h])
-                               for h in range(len(signals))])
+        traces = torch.tensor([
+                              trace( signals[h].T @ shifts[h] @ signals[h])
+                              for h in range(len(signals))
+                              ])
         total_variation_penalty = multipliers @ traces
         return total_variation_penalty
+        
+    def log_barrier(self, shifts, multipliers):
+        """
+        
+        Compute, for every layer h,
+        the sum of the log barriers of the graph shift.
+
+        This measures how partitioned (disconnected) the underlying graph is.        
+
+        Every log barrier has its own multiplier (gamma_h)
+        
+        Parameters
+        ----------
+        shifts : vector or list of torch.tensor
+            a vector of the shifts operato
+        multipliers : vector (torch.tensor)
+            a vector of the multipliers for the log barrier
+                * multipliers[h] = gamma_h
+
+        Returns
+        -------
+        log_barrier_penalty : float 
+            the sum of all the log barriers,
+            scaled by their respective multipliers
+
+        """
+        ones = torch.ones(shifts[0].shape[0])
+        log_barriers = torch.tensor([
+                                    ones.T @ log(clip(S @ ones, min=1e-8))
+                                    for S in shifts
+                                    ])
+        log_barrier_penalty = multipliers @ log_barriers
+        return log_barrier_penalty
         
         
     def forward(self, estimate, target):
         pass
-    
+
 
 class adaptExtraDimensionLoss(nn.modules.loss._Loss):
     """
