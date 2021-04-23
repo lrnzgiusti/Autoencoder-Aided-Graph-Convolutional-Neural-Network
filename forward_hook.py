@@ -40,6 +40,7 @@ class MyModel(nn.Module):
 activation = {}
 def get_activation(name):
     def hook(model, input, output):
+        print(model)
         activation[name] = output.detach()
     return hook
 

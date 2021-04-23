@@ -46,9 +46,24 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             Prevents the shift to be associated to a disconnected graph.
             Penalizes a graph shift operator that
             tend to be associated to a disconnected graph
+    Note: 
+        speed ups can be reached by some matrix-tensor product
+    
     """
-    def __init__(self, lossFunction):
-        pass
+    def __init__(self, lossFunction, multipliers):
+        self.loss = lossFunction
+        self.shifts = []
+        self.signals = []
+        self.multipliers = {k : torch.tensor(v) 
+                            for k,v in multipliers.items()}
+    
+    def add_shift_and_signal(self, shift, signal):
+        self.shifts.append(shift)
+        self.signals.append(signal)
+    
+    def flush_shift_and_signals(self):
+        self.shifts.clear()  #TODO: capire quando va chiamata questa funzione
+        self.signals.clear()
     
     def frobenius_norm(self, shifts, multipliers):
         """
@@ -139,6 +154,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
 
         """
         ones = torch.ones(shifts[0].shape[0])
+        
         log_barriers = torch.tensor([
                                     ones.T @ log(clip(S @ ones, min=1e-8))
                                     for S in shifts
@@ -148,7 +164,24 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         
         
     def forward(self, estimate, target):
-        pass
+        frobenius_penalty = self.frobenius_norm(self.shifts, 
+                                                self.multipliers['lambda'])
+        tv_penalty = self.total_variation(self.shifts, 
+                                          self.signals, 
+                                          self.multipliers['beta'])
+        
+        log_barrier_penalty = self.log_barrier(self.shifts, 
+                                               self.multipliers['gamma'])
+        
+        
+        self.flush_shift_and_signals()
+        
+        return  self.loss(estimate, target) + \
+                frobenius_penalty + \
+                tv_penalty - \
+                log_barrier_penalty
+               
+            
 
 
 class adaptExtraDimensionLoss(nn.modules.loss._Loss):

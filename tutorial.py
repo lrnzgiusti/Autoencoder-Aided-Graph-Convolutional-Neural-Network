@@ -895,17 +895,18 @@ costValid = {}
 
 
 for thisModel in modelsGNN.keys():
-    print("Training model %s..." % thisModel, end = ' ', flush = True)
-    
-    #Train
-    thisTrainVars = modelsGNN[thisModel].train(data, nEpochs, batchSize, **trainingOptions)
-    # Save the variables
-    lossTrain[thisModel] = thisTrainVars['lossTrain']
-    costTrain[thisModel] = thisTrainVars['costTrain']
-    lossValid[thisModel] = thisTrainVars['lossValid']
-    costValid[thisModel] = thisTrainVars['costValid']
-    
-    print("OK", flush = True)
+    if thisModel == 'SelGNN':
+        print("Training model %s..." % thisModel, end = ' ', flush = True)
+        
+        #Train
+        thisTrainVars = modelsGNN[thisModel].train(data, nEpochs, batchSize, **trainingOptions)
+        # Save the variables
+        lossTrain[thisModel] = thisTrainVars['lossTrain']
+        costTrain[thisModel] = thisTrainVars['costTrain']
+        lossValid[thisModel] = thisTrainVars['lossValid']
+        costValid[thisModel] = thisTrainVars['costValid']
+        
+        print("OK", flush = True)
 
 
 # ## Evaluation <a class="anchor" id="sec:evaluation"></a>

@@ -88,6 +88,24 @@ class Trainer:
         self.model = model
         self.data = data
         
+        def get_activation(self.model.loss):
+            def hook(model, input, output):
+                
+                sel = output.detach()
+            return hook
+        
+        ####################################
+        #     REGISTER FORWARD HOOK        #
+        ####################################
+        
+        for l in range(0, 3*self.model.archit.L, 3):
+            #The range is so defined because we want to grab the filters
+            #which are positioned in the sequential layer onces every three 
+            # LSIGF -> Rho -> Sigma -> LSIGF -> Rho -> Sigma, ecc
+            self.model.archit.GFL[l].register_forward_hook()
+            
+        
+        
         ####################################
         # ARGUMENTS (Store chosen options) #
         ####################################

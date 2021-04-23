@@ -2133,6 +2133,7 @@ class GraphFilter(nn.Module):
                            torch.zeros(B, F, self.N-Nin)\
                                    .type(x.dtype).to(x.device)
                           ), dim = 2)
+        
         # Compute the filter output
         u = LSIGF(self.weight, self.S, x, self.bias)
         # So far, u is of shape batchSize x dimOutFeatures x numberNodes
