@@ -36,6 +36,7 @@ import scipy.sparse
 import scipy.spatial as sp
 from sklearn.cluster import SpectralClustering
 
+import torch
 import os
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
@@ -1615,7 +1616,41 @@ def permCoarsening(x, indices):
 
 
 
-def sparse_dupli_matrix_iter(N : int) -> torch.Tensor:
+
+def build_elimination_matrix(N : int, sparse : bool = False) -> torch.Tensor:
+    """
+    
+    Build a sparse elimination matrix
+
+    Parameters
+    ----------
+    N : int
+        The dimension of the adjacency matrix.
+
+    sparse : bool
+        Wether or not the result is sparse
+    Returns
+    -------
+    torch.sparse.FloatTensor
+        sparse representation of elimination matrix.
+
+    """
+    T = np.triu(np.ones(N))
+    f = np.where(T.flatten())[0]
+    k = N*(N+1)//2
+    nsq = N**2
+    x = f + nsq*np.arange(0,k)
+    idxs = np.unravel_index(x, (k, nsq))
+    vals = torch.ones((len(idxs[0]),), dtype=torch.float32)
+    idxs = np.row_stack(idxs)  #np.column_stack((idxs[0],idxs[1]))
+    E = torch.sparse.FloatTensor(torch.from_numpy(idxs), 
+                                    vals, 
+                                    (k, nsq)).coalesce()
+    if sparse:
+        return E
+    return E.to_dense()
+
+def build_duplication_matrix(N : int, sparse : bool  = False) -> torch.Tensor:
     """
     Build a sparse duplication matrix
 
@@ -1623,6 +1658,8 @@ def sparse_dupli_matrix_iter(N : int) -> torch.Tensor:
     ----------
     N : int
         The dimension of the adjacency matrix.
+    sparse : bool
+        Wether or not the result is sparse
 
     Returns
     -------
@@ -1652,6 +1689,9 @@ def sparse_dupli_matrix_iter(N : int) -> torch.Tensor:
     vals = torch.ones((len(v)), dtype=torch.float32)
     idxs = [[rows[i], v[i]] for i in range(nsq)]
     idxs = torch.Tensor(idxs).type(torch.LongTensor).t()
-    return torch.sparse.FloatTensor(idxs, 
+    D = torch.sparse.FloatTensor(idxs, 
                                     vals, 
                                     (nsq, m)).coalesce()
+    if sparse:
+        return D
+    return D.to_dense()
