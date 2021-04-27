@@ -1612,3 +1612,46 @@ def permCoarsening(x, indices):
         else:
             xnew[:,:,i] = np.zeros([B, F])
     return xnew
+
+
+
+def sparse_dupli_matrix_iter(N : int) -> torch.Tensor:
+    """
+    Build a sparse duplication matrix
+
+    Parameters
+    ----------
+    N : int
+        The dimension of the adjacency matrix.
+
+    Returns
+    -------
+    torch.sparse.FloatTensor
+        sparse representation of duplication matrix.
+
+    """
+    m   = N * (N + 1) // 2;
+    nsq = N**2;
+    r   = 1;
+    a   = 1;
+    v   = np.zeros(nsq+1, dtype=np.int32);
+    for i in range(1, N+1):
+       b = i;
+       for j in range(0, i-2+1):
+          v[r] = b;
+          b    = b + N - j - 1;
+          r    = r + 1;
+       
+       for j in range(0, N-i+1):
+         v[r] = a + j;
+         r    = r + 1;
+       
+       a = a + N - i + 1;
+    v = v[1:]-1
+    rows = np.arange(0,nsq, dtype=np.int32)
+    vals = torch.ones((len(v)), dtype=torch.float32)
+    idxs = [[rows[i], v[i]] for i in range(nsq)]
+    idxs = torch.Tensor(idxs).type(torch.LongTensor).t()
+    return torch.sparse.FloatTensor(idxs, 
+                                    vals, 
+                                    (nsq, m)).coalesce()

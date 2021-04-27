@@ -51,7 +51,10 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
     
     """
     def __init__(self, lossFunction, multipliers):
-        self.loss = lossFunction
+        
+        super().__init__()
+        
+        self.loss = lossFunction()
         self.shifts = []
         self.signals = []
         self.multipliers = {k : torch.tensor(v) 
@@ -122,11 +125,13 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
 
         """
         traces = torch.tensor([
-                              trace( signals[h].T @ shifts[h] @ signals[h])
-                              for h in range(len(signals))
-                              ])
+            [
+                T.trace()   
+                for T in signals[h] @ shifts[h] @ signals[h].permute(0,2,1)  
+            ] for h in range(len(signals))]
+            )
         total_variation_penalty = multipliers @ traces
-        return total_variation_penalty
+        return total_variation_penalty.sum()
         
     def log_barrier(self, shifts, multipliers):
         """
@@ -153,10 +158,13 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        ones = torch.ones(shifts[0].shape[0])
+        ones = torch.ones(shifts[0].shape[-1])
         
+        #Renz.io lo squeeze va messo perchè la tensor contraction
+        #genera una dimensione in più dove non ci sono informazioni
         log_barriers = torch.tensor([
-                                    ones.T @ log(clip(S @ ones, min=1e-8))
+                                    ones.T @ log(clip((S @ ones).squeeze(0)
+                                                      , min=1e-8))
                                     for S in shifts
                                     ])
         log_barrier_penalty = multipliers @ log_barriers
@@ -173,9 +181,12 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         log_barrier_penalty = self.log_barrier(self.shifts, 
                                                self.multipliers['gamma'])
         
+        print("CE:", self.loss(estimate, target),
+              "\nFrob:", frobenius_penalty,
+              "\nTV:", tv_penalty, 
+              "\nlogB:", log_barrier_penalty)
         
         self.flush_shift_and_signals()
-        
         return  self.loss(estimate, target) + \
                 frobenius_penalty + \
                 tv_penalty - \

@@ -176,7 +176,6 @@
 
 # In[1]:
 
-
 import os
 import numpy as np
 import pickle
@@ -369,8 +368,12 @@ writeVarValues(varsFile, {'nTrain': nTest,
 
 # In[15]:
 
-
+multipliers = {"lambda" : [0.0, 0.0],
+               "gamma" : [0.0, 0.0],
+               "beta" : [0.0, 0.0]}
 lossFunction = nn.CrossEntropyLoss
+customLoss = loss.MultiGraphLearningLoss
+
 
 
 # Now that we have selected the loss function, we need to determine how to handle the training and evaluation. This, mostly, amounts to selecting wrappers that will handle the batch size partitioning, early stopping, validation, etc. The specifics of the evaluation measure, for example, depend on the data being measured and, thus, are parte of the <code>data</code> class.
@@ -819,7 +822,7 @@ thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta
 
 #\\\ Model
 SelGNN = model.Model(thisArchit,
-                     lossFunction(),
+                     customLoss(nn.CrossEntropyLoss, multipliers),
                      thisOptim,
                      trainer,
                      evaluator,
@@ -896,17 +899,21 @@ costValid = {}
 
 for thisModel in modelsGNN.keys():
     if thisModel == 'SelGNN':
-        print("Training model %s..." % thisModel, end = ' ', flush = True)
+        trainingOptions['learnGraph'] = True
+    else:
+        trainingOptions['learnGraph'] = False
         
-        #Train
-        thisTrainVars = modelsGNN[thisModel].train(data, nEpochs, batchSize, **trainingOptions)
-        # Save the variables
-        lossTrain[thisModel] = thisTrainVars['lossTrain']
-        costTrain[thisModel] = thisTrainVars['costTrain']
-        lossValid[thisModel] = thisTrainVars['lossValid']
-        costValid[thisModel] = thisTrainVars['costValid']
-        
-        print("OK", flush = True)
+    print("Training model %s..." % thisModel, end = ' ', flush = True)
+    
+    #Train
+    thisTrainVars = modelsGNN[thisModel].train(data, nEpochs, batchSize, **trainingOptions)
+    # Save the variables
+    lossTrain[thisModel] = thisTrainVars['lossTrain']
+    costTrain[thisModel] = thisTrainVars['costTrain']
+    lossValid[thisModel] = thisTrainVars['lossValid']
+    costValid[thisModel] = thisTrainVars['costValid']
+    
+    print("OK", flush = True)
 
 
 # ## Evaluation <a class="anchor" id="sec:evaluation"></a>
@@ -919,6 +926,7 @@ for thisModel in modelsGNN.keys():
 
 costBest = {} # Classification accuracy obtained for the best model
 costLast = {} # Classification accuracy obtained for the last model
+
 
 
 # Then, we just run the <code>.evaluate</code> method from the <code>Model</code> class. The output is a dictionary with the corresponding cost, which we save into the previous dictionary.
