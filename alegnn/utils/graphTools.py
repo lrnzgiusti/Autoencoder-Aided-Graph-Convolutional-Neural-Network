@@ -36,7 +36,7 @@ import scipy.sparse
 import scipy.spatial as sp
 from sklearn.cluster import SpectralClustering
 
-import torch
+import torch; torch.set_default_dtype(torch.float64)
 import os
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
@@ -1266,6 +1266,10 @@ class Graph():
         #\\\ GSO (Graph Shift Operator):
         #   The weighted adjacency matrix by default
         self.S = self.W
+        E = build_elimination_matrix(self.N, sparse=False)
+        D = build_duplication_matrix(self.N, sparse=False)
+        self.alphaS = torch.nn.parameter.Parameter((E @ self.S.reshape(-1,1)))
+        self.Sparam = (D @ self.alphaS).reshape((self.N, self.N))
         #\\\ GFT: Declare variables but do not compute it unless specifically
         # requested
         self.E = None # Eigenvalues
@@ -1645,7 +1649,7 @@ def build_elimination_matrix(N : int, sparse : bool = False) -> torch.Tensor:
     idxs = np.row_stack(idxs)  #np.column_stack((idxs[0],idxs[1]))
     E = torch.sparse.FloatTensor(torch.from_numpy(idxs), 
                                     vals, 
-                                    (k, nsq)).coalesce()
+                                    (k, nsq)).coalesce().double()
     if sparse:
         return E
     return E.to_dense()
@@ -1691,7 +1695,7 @@ def build_duplication_matrix(N : int, sparse : bool  = False) -> torch.Tensor:
     idxs = torch.Tensor(idxs).type(torch.LongTensor).t()
     D = torch.sparse.FloatTensor(idxs, 
                                     vals, 
-                                    (nsq, m)).coalesce()
+                                    (nsq, m)).coalesce().double()
     if sparse:
         return D
     return D.to_dense()

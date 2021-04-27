@@ -1,179 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Graph Neural Network Tutorial
-# 
-# This is a brief tutorial introducing the different elements of the code for using graph neural networks. This tutorial revolves around the example of source localization and covers the basic aspects of defining a graph neural network using the libraries provided here and training it.
-# 
-# After a brief introduction on the key concepts to define the problem and the GNN architectures, we move on to importing the appropriate libraries, defining the relevant parameters, and setting up the framework. Then, creating the graph, the datasets, and initializing the models. Later, training the models and evaluating them (after trained). Finally, we print the result and create useful figures with information from the training process.
-# 
-# 1. [Introduction](#sec:introduction)
-#     * [Source localization problem](#subsec:sourceLoc)
-#     * [Graph neural networks (GNNs)](#subsec:GNNs)
-#         * [Aggregation GNN](#subsubsec:AggGNN)
-#         * [Selection GNN](#subsubsec:SelGNN)
-# 
-# * [Libraries](#sec:libraries)
-# 
-# * [Simulation Parameters](#sec:simulationParameters)
-#      * [File handling](#subsec:fileHandling)
-#      * [Data parameters](#subsec:dataParameters)
-#      * [Training parameters](#subsec:trainingParameters)
-#      * [Architecture hyperparameters](#subsec:architHyperparameters)
-#          * [Aggregation GNN](#subsubsec:AggGNNhyper)
-#          * [Selection GNN (with zero-padding)](#subsubsec:SelGNNhyper)
-#          * [Selection GNN (with graph coarsening)](#subsubsec:CrsGNNhyper)
-#      * [Logging parameters](#subsec:loggingParameters)
-# 
-# * [Basic Setup](#sec:basicSetup)
-# 
-# * [Graph Creation](#sec:graphCreation)
-# 
-# * [Data Creation](#sec:dataCreation)
-# 
-# * [Model Initialization](#sec:modelInitialization)
-#     * [Aggregation GNN](#subsec:AggGNNmodel)
-#     * [Selection GNN (with zero-padding)](#subsec:SelGNNmodel)
-#     * [Selection GNN (with graph coarsening)](#subsec:CrsGNNmodel)
-# 
-# * [Training](#sec:training)
-# 
-# * [Evaluation](#sec:evaluation)
-#     * [Best model](#subsec:bestEval)
-#     * [Last model](#subsec:lastEval)
-# 
-# * [Results](#sec:results)
-#     * [Figures](#subsec:figures)
-
-# ## Introduction <a class="anchor" id="sec:introduction"></a>
-# We briefly overview the problem formulation and the architectures that we will implement later on. While we are at it, we define the corresponding notation. The main concepts in this introduction are developed as in the next paper.
-# 
-# F. Gama, A. G. Marques, G. Leus, and A. Ribeiro, "<a href="https://ieeexplore.ieee.org/document/8579589">Convolutional Neural Network Architectures for Signals Supported on Graphs</a>," <em>IEEE Transactions on Signal Processing</em>, vol. 67, no. 4, pp. 1034-1049, Feb. 2019.
-# 
-# These are <a href="https://openreview.net/forum?id=DQNsQf-UsoDBa">two</a> <a href="https://papers.nips.cc/paper/6081-convolutional-neural-networks-on-graphs-with-fast-localized-spectral-filtering.pdf">papers</a> that are considered to be seminal contributions to GNNs and offer a similar approach.
-
-# ### Source localization problem <a class="anchor" id="subsec:sourceLoc"></a>
-# Let $\mathcal{G} = (\mathcal{V}, \mathcal{E}, \mathcal{W})$ be a given graph, where $\mathcal{V}$ is the set of $N$ nodes, $\mathcal{E} \subseteq \mathcal{V} \times \mathcal{V}$ is the set of edges and $\mathcal{W}: \mathcal{E} \to \mathbb{R}$ is the function that assigns weights to the edges. We can describe this graph in terms of a graph shift operator $\mathbf{S}$ which is a $N \times N$ matrix that respects the sparsity of the graph. That is, its $(i,j)$ element $[\mathbf{S}]_{ij}$ is nonzero if and only if it is a diagonal element or there is an edge connecting nodes $i$ and $j$, i.e. $i=j$ or $(j,i) \in \mathcal{E}$. The graph shift operator can be, in general, any matrix description of the graph. Examples include the adjacency matrix, the graph Laplacian, the Markov matrix, among many others. To simplify nomenclature, we assume that $\mathbf{S}$ completely describes the graph and, as such, we might refer to the GSO as the graph itself.
-# 
-# This given graph $\mathbf{S}$ acts as a support for the data $\mathbf{x}$, describing the arbitrary pairwise relationships between the data elements. More specifically, we say that the data $\mathbf{x}$ is a graph signal that assigns a scalar value to each node of the graph, $\mathbf{x}: \mathcal{V} \to \mathbb{R}$. We can interpret this graph signal as an $N$-dimensional vector $\mathbf{x} \in \mathbb{R}^{N}$ where the $i$th element $[\mathbf{x}]_{i} = x_{i}$ represents the value of the data at node $i$.
-# 
-# In the source localization problem, the input data is a graph signal $\mathbf{x}$ of the form $\mathbf{x} = \mathbf{W}^{t} \boldsymbol{\delta}_{c}$, where $\mathbf{W}$ is the adjacency matrix of the given graph, $t$ is the diffusion time and $\boldsymbol{\delta}_{c}$ is a graph signal that has a value of $1$ at node $c \in \mathcal{V}$, and a value of $0$ at all the other nodes. In essence, the input data is a graph signal that comes from a diffusion process, originated at some node $c$ (note that since $\mathbf{W}$ is the adjacency matrix, each multiplication by $\mathbf{W}$ computes the average of neighboring values). Node $c$ is <em>turned on</em> and its value starts diffusing through the network for some time $t$. We observe the result of such a diffusion. The objective of the source localization problem is, given $\mathbf{x}$, estimate which node $c$ originated the diffusion (the diffusion time $t$ is unknown). In particular, in this tutorial, we consider a stochastic block model (SBM) graph as a the underlying support with a number $C$ of communities, and we want to identify which <em>community</em> originated the diffusion.
-# 
-# This problem can be cast as a supervised classification problem given a training set comprised of input-output pairs $(\mathbf{x}, c)$, where $c$ is now the community that has originated the diffusion. We can thus use a graph neural network (GNN) on $\mathbf{x}$ to output a one-hot vector on the number of classes (number of communities), and use a cross-entropy loss to compare it with $c$ and train the GNN.
-
-# ### Graph neural networks (GNNs) <a class="anchor" id="subsec:GNNs"></a>
-# A neural network is an information processing architecture that is comprised of a concatenation of $L$ layers, each of which applies, to the output of the previous layer, a linear transform $\mathbf{A}_{\ell}$, followed by an activation function $\sigma_{\ell}$ (typically, a pointwise nonlinearity)
-# 
-# $$ \mathbf{x}_{\ell} = \sigma_{\ell} \left( \mathbf{A}_{\ell} \mathbf{x}_{\ell-1} \right) \ , \ \ell=1,\ldots,L $$
-# 
-# with $\mathbf{x}_{0} = \mathbf{x}$ the input data. The elements of the linear transform $\mathbf{A}_{\ell}$ are considered to be <em>parameters</em> that can be <em>learned</em> by minimizing some loss function over a given training set. However, since the number of elements in $\mathbf{A}_{\ell}$ depend on the size of the input $\mathbf{x}$, this architecture does not scale to large inputs, due to rising problems such as the curse of dimensionality, the need for large datasets, and the excessive computational cost.
-# 
-# In the case of regular-structured data such as time series or images, the linear transform is restricted (regularized) to be a convolution with a bank of small-support filters, giving rise to the <em>convolutional neural network</em> (CNN). This regularization allows CNNs to scale, and as such, have achieved remarkable performance in classification and regression tasks involving time or image data.
-# 
-# In the case of graph-based data, such as the source localization problem, the structural information that we need to exploit is encoded in the graph $\mathbf{S}$. So we need to regularize the linear transform $\mathbf{A}_{\ell}$ by an operation that takes into account the graph structure in $\mathbf{S}$. Thus, in its most general form, we define the graph neural network (GNN) as
-# 
-# $$ \mathbf{x}_{\ell} = \sigma_{\ell} \left( \mathbf{A}_{\ell} ( \mathbf{S}) \mathbf{x}_{\ell-1} \right) $$
-# 
-# where we denote explicitly that $\mathbf{A}_{\ell}(\mathbf{S})$ is a linear operation that depends on the graph structure $\mathbf{S}$.
-# 
-# Oftentimes (especially in deeper layers), we might want to consider that the data is not represented by a single scalar associated to each node, but by an entire vector. That is, instead of describing data as $\mathbf{x}: \mathcal{V} \to \mathbb{R}$, we describe it as $\mathbf{x}: \mathcal{V} \to \mathbb{R}^{F}$, that is, we associate to each node a vector of size $F$, where each element of this vector is said to be a <em>feature</em>. Two ways of compactly describing this data are in terms of a matrix $\mathbf{X} \in \mathbb{R}^{N \times F}$ or in terms of a vector $\mathbf{x} \in \mathbb{R}^{NF}$ that is the concatenation of all the features for each node. In any case, and in order to highlight the graph structure (the interaction among nodes), we think of the data as a collection of $F$ graph signals $\mathbf{x} = \{ \mathbf{x}^{f} \}_{f=1}^{F}$. That is, each $\mathbf{x}^{f}$ is a traditional graph signal $\mathbf{x}^{f}: \mathcal{V} \to \mathbb{R}$ assigning a scalar to each node (each graph signal is the collection of the $f$th feature across all nodes). Thinking of the graph signal this way, instead of thinking it as a collection of features on each node, allows us to exploit the graph structure in $\mathbf{S}$ to operate on the data.
-# 
-# For the more realistic case, we consider the GNN as a regularization of the linear transform with a bank of graph filters. We assume that input to the $\ell$th layer has $F_{\ell-1}$ features and we want to obtain $F_{\ell}$ features at the output. Then, the GNN becomes
-# 
-# $$ \mathbf{x}_{\ell}^{f} = \sigma_{\ell} \left( \sum_{g=1}^{F_{\ell-1}} \mathbf{H}_{\ell}^{fg}(\mathbf{S}) \mathbf{x}_{\ell-1}^{g} \right) \ , \ f=1,\ldots,F_{\ell} $$
-# 
-# where the linear transform $\mathbf{A}_{\ell}(\mathbf{S})$ has been replaced by a bank of $F_{\ell}F_{\ell-1}$ <em>graph</em> filters $\mathbf{H}_{\ell}^{fg}(\mathbf{S})$, each of which is an operation that exploits the graph structure. There are several type of graph filters (node-variant, edge-variant, attention, etc.) that can be adopted for $\mathbf{H}_{\ell}^{fg}(\mathbf{S})$, many of which are available as options in the code, and that pursue a regularization of the linear transform such that the number of <em>learnable</em> parameters is independent of the size of the input data (number of nodes). In this tutorial, we focus on linear shift-invariant (LSI) graph filters that give rise to <em>graph convolutions</em> as described in the next two architectures.
-# 
-# Finally, to wrap up this introduction on GNNs, we consider the operation of <em>pooling</em>. We note that, if in the pursuit of learning more descriptive features, we keep increasing the number of features $F_{\ell}$ as $\ell$ increases, then we are also increasing the dimensionality. More specifically, at each layer $\ell$, the dimensionality of the data is $N F_{\ell}$. In order to avoid this increase in dimensionality, the pooling operation is typically used to decrease the size of $N$ (so that, in essence, we are trading spatial information for feature information, decreasing $N$ and increasing $F_{\ell}$). The pooling operation is a summarizing function followed by a downsampling procedure. The summarizing function $\rho_{\ell}$ <em>pools together</em> the value of the signal in the $\alpha_{\ell}$-hop neighborhood of each node, as determined by the graph $\mathbf{S}$, creating a summary of a given region. We can describe it as a summarizing function $\rho_{\ell}(\cdot;\mathbf{S}, \alpha_{\ell})$ that depends on the graph structure (to determine which are the neighborhoods). This summarizing function is followed by a downsampling operation $\mathbf{C}_{\ell}$ that selects only a few of the elements (selects only a few of the summaries to keep as representatives of the data in that region). Then, each layer $\ell$ of the GNN becomes
-# 
-# $$ \mathbf{x}_{\ell}^{f} = \mathbf{C}_{\ell} \rho_{\ell} \left( \sigma_{\ell} \left( \sum_{g=1}^{F_{\ell-1}} \mathbf{H}_{\ell}^{fg}(\mathbf{S}) \mathbf{x}_{\ell-1}^{g} \right); \mathbf{S}, \alpha_{\ell} \right) \ , \ f=1,\ldots,F_{\ell} $$
-# 
-# where $\mathbf{x}_{\ell}^{f} \in \mathbb{R}^{N_{\ell}}$ has $N_{\ell}$ elements, and $\mathbf{C}_{\ell} \in \{0,1\}^{N_{\ell} \times N_{\ell-1}}$ is a $N_{\ell} \times N_{\ell-1}$ binary selection matrix that selects $N_{\ell} \leq N_{\ell-1}$ elements out of the $N_{\ell-1}$ elements existing after the graph filtering and the pointwise activation function. Note that selection matrix $\mathbf{C}_{\ell}$ satisfies $\mathbf{C}_{\ell} \mathbf{1} = \mathbf{1}$ and $\mathbf{C}_{\ell}^{\mathsf{T}} \mathbf{1} \leq \mathbf{1}$.
-
-# #### Aggregation GNN <a class="anchor" id="subsubsec:AggGNN"></a>
-# <img src="aggGNN.png">
-# 
-# The aggregation GNN architecture starts by building an <em>aggregation sequence</em> in some node $i \in \mathcal{V}$. The aggregation sequence $\mathbf{z}_{i}^{f}$ at node $i$ is built by repeatedly exchanging information with the neighborhoods $\mathbf{S}^{k} \mathbf{x}^{f}$, and storing the average resulting at node $i$, $[\mathbf{S}^{k}\mathbf{x}]_{i}$ for each successive $k$, starting with $k=0$ all the way up to some number $k=N_{\max}-1$. This generates the aggregation sequence $\mathbf{z}_{i}^{f} \in \mathbb{R}^{N_{\max}}$ which is a $N_{\max}$-dimensional vector given by
-# 
-# $$\mathbf{z}_{i}^{f} = \big[ [\mathbf{x}^{f}]_{i}, [\mathbf{S} \mathbf{x}^{f}]_{i}, \ldots, [\mathbf{S}^{N_{\max}-1} \mathbf{x}^{f}]_{i} \big] $$
-# 
-# We note that if we set $N_{\max} = N$ the total number of nodes in the graph, then the resulting signal $\mathbf{z}_{i}^{f}$ is equivalent to $\mathbf{x}^{f}$ (as long as all the eigenvalues of the GSO $\mathbf{S}$ are distinct).
-# 
-# Observe that the aggregation sequence $\mathbf{z}_{i}^{f}$ depends on both the input data $\mathbf{x}^{f}$ and the graph structure $\mathbf{S}$. Furthermore, it has a <em>regular structure</em>, meaning that consecutive elements in the vector, represent consecutive neighborhoods. Therefore, the aggregation squence $\mathbf{z}_{i}^{f}$ is, simultaneously, regular-structured and includes information about the graph. Now, once we have a regular-structured signal, we can just go ahead an apply a regular convolution. Given a set of filter taps $\{h_{k}\}$, we observe that the $n$th element of the output of a regular convolution $\mathbf{h} \ast \mathbf{z}_{i}^{f}$ yields
-# 
-# $$ [ \mathbf{h} \ast \mathbf{z}_{i}^{f} ]_{n} = \sum_{k=0}^{K-1} h_{k} [\mathbf{z}_{i}^{f}]_{n-k} = \sum_{k=0}^{K-1} h_{k} [\mathbf{S}^{n-k-1} \mathbf{x}^{f}]_{i} $$
-# 
-# This means that applying a regular convolution to the vector $\mathbf{z}_{i}^{f}$ is, indeed, computing a proper average of the information contained in consecutive neighborhoods, effectively integrating these values into the computation of a new feature. In essence, a regular convolution with a bank of filters, acts as a <em>graph filter</em> since the overall operation depends on $\mathbf{S}$, even though the dependence on $\mathbf{S}$ is obtained through $\mathbf{z}_{i}^{f}$ and not through the filter $\mathbf{h}$. Likewise, this regular structure implies that we can also apply a regular pooling, summarizing information from nearby elements, and be sure we are properly aggregating information from neighboring nodes. So, in essence, once we have built the aggregation sequence $\mathbf{z}_{i}^{f}$ at node $i$, we can proceed to feed this aggregation sequence into a regular CNN and be sure that the features that are learned by this CNN effectively take into account the structre of the graph (since $\mathbf{z}_{i}^{f}$ depends on $\mathbf{S}$).
-# 
-# The [hyperparameters](#subsubsec:AggGNNhyper) that we need to determine for this architecture include the nodes $i$ on which we are going to build the aggregation sequence, the total number of exchanges $N_{\max}$, and the usual hyperparameters of CNNs (number of layers, number of features, size of the filters, size of the pooling, and number of elements to keep after the pooling).
-
-# #### Selection GNN <a class="anchor" id="subsubsec:SelGNN"></a>
-# Alternatively, we can process the signal directly on the graph, without need to build the aggregation sequence, using <em>graph convolutions</em>. In analogy with regular convolution, which is defined as a weighted average of (time- or space-)shifted versions of the signal, we define the <em>graph convolution</em> as a weighted average of graph-shifted versions of the signal. More precisely, given a set of $K$ filter taps $\mathbf{h} = \{h_{k}\}_{k=0}^{K-1}$ and a graph signal $\mathbf{x}^{f} \in \mathbb{R}^{N}$ defined over a graph $\mathbf{S} \in \mathbf{R}^{N \times N}$, the graph convolution is computed as
-# 
-# $$ \mathbf{h} \ast_{\mathbf{S}} \mathbf{x}^{f} = \sum_{k=0}^{K-1} h_{k} \mathbf{S}^{k} \mathbf{x}^{f} = \mathbf{H}(\mathbf{S}) \mathbf{x}^{f} $$
-# 
-# where $(\mathbf{S}^{k}\mathbf{x}^{f})$ is the $k$-times graph-shifted version of the graph signal $\mathbf{x}^{f}$. We note that it also represents a summary (a weighted sum) of the information contained in the $k$-hop neighborhood of the signal. Thus, the graph convolution is a weighted average of summaries of information located in further away neighborhoods (compare with the regular convolution applied to the aggregation sequence in the previous architecture). We can also see the graph convolution as the application of a linear operator $\mathbf{H}(\mathbf{S}) = \sum_{k=0}^{K-1} h_{k} \mathbf{S}^{k}$ that depends on the graph structure. We call this operator a linear shift-invariant (LSI) <em>graph filter</em>.
-# 
-# When considering a selection GNN, let's start with the simpler non-pooling case. Then, to obtain a GNN computed entirely on the given graph, we just replace the bank of linear operators $\mathbf{H}_{\ell}^{fg}(\mathbf{S})$ by a bank of graph filter banks, each with $K_{\ell}$ filter taps given by $\mathbf{h}_{\ell}^{fg} = \{ h_{\ell k}^{fg} \}_{k=0}^{K_{\ell}-1}$, yielding
-# 
-# $$ \mathbf{x}_{\ell}^{f} = \sigma_{\ell} \left( \sum_{g=1}^{F_{\ell-1}} \mathbf{H}_{\ell}^{fg}(\mathbf{S}) \mathbf{x}_{\ell-1}^{g} \right) = \sigma_{\ell} \left( \sum_{g=1}^{F_{\ell-1}} \left( \sum_{k=0}^{K_{\ell}-1} h_{\ell k}^{fg} \mathbf{S}^{k} \mathbf{x}_{\ell-1}^{g} \right) \right) \ , \ f=1,\ldots,F_{\ell} $$
-# 
-# The filter taps $\mathbf{h}_{\ell}^{fg} = \{ h_{\ell k}^{fg} \}_{k=0}^{K_{\ell}-1}$ are the <em>learnable</em> parameters of the linear transform, totalling $K_{\ell}F_{\ell}F_{\ell-1}$ for the entire filter bank, a number that is independent of the size $N$ of the graph. We note that, since there is no pooling, the input data to each layer $\mathbf{x}_{\ell-1}^{g} \in \mathbb{R}^{N}$ is always a graph signal, and as such, can be processed directly using the given graph shift operator $\mathbf{S} \in \mathbb{R}^{N \times N}$.
-# 
-# <img src="selGNN.png">
-# 
-# When we want to do pooling, we have to consider that the graph $\mathbf{S}$ is given, and it is the support on which interactions between nodes can occur. Let's start by examining the first layer $\ell=1$. The input to the first layer is the input data $\mathbf{x}^{f}$ which is, in itself, a graph signal. First, we do a graph convolution to obtain
-# 
-# $$ \mathbf{u}_{1}^{f} = \sum_{g=1}^{F} \mathbf{H}_{1}^{fg}(\mathbf{S}) \mathbf{x}^{g}  \ , \ f=1,\ldots,F_{1} $$
-# 
-# where the output $\mathbf{u}_{1}^{f} \in \mathbb{R}^{N}$ is also a graph signal. Next, we apply the pointwise nonlinearity $\sigma_{1}$ obtaining
-# 
-# $$ \mathbf{v}_{1}^{f} = \sigma_{1} \left( \mathbf{u}_{1}^{f} \right)  \ , \ f=1,\ldots,F_{1} $$
-# 
-# where $\mathbf{v}_{1}^{f} \in \mathbb{R}^{N}$ is also a graph signal, since the nonlinearity is applied independently to each node. The last step is to apply a summarizing function $\rho_{1}$ and downsample. The summarizing function $\rho_{1}$ has to depend on the underlying graph support since it needs to summarize the information included in a given neighborhood. We denote this dependence as $\rho_{1}(\cdot ; \mathbf{S},\alpha_{1})$ where $\alpha_{1}$ indicates that the summarizing function gathers information up to the $\alpha_{1}$-hop neighborhood given by the graph $\mathbf{S}$ (for example, if we decide to do max-pooling, we consider that the each node computes the maximum among all the nodes within the $\alpha_{1}$-hop neighborhood, and updates its own value with that maximum). The downsampling is carried out by multiplying by a $N_{1} \times N$ selection matrix $\mathbf{C}_{1} \in \mathbb{R}^{N_{1} \times N}$ that determines how many nodes $N_{1} < N$ we keep (since each node now has a summary of their $\alpha_{1}$-hop neighborhood, we are basically keeping some of these nodes as representatives of their neighborhoods). Recall that a selection matrix satisfies $\mathbf{C}_{1} \mathbf{1} = \mathbf{1}$ and $\mathbf{C}_{1}^{\mathsf{T}} \mathbf{1} \leq \mathbf{1}$. Thus, the output of the first layer, becomes
-# 
-# $$ \mathbf{x}_{1}^{f} = \mathbf{C}_{1} \rho_{1} \left( \mathbf{v}_{1}^{f} ; \mathbf{S}, \alpha_{1} \right) $$
-# 
-# which is a $N_{1}$-dimensional vector $\mathbf{x}_{1}^{f} \in \mathbb{R}^{N_{1}}$ with $N_{1} < N$.
-# 
-# The vector $\mathbf{x}_{1}^{f} \in \mathbb{R}^{N_{1}}$ acts as the input to the $\ell=2$ layer. But in order for us to carry out a graph convolution, we need a vector of dimension $N$ that represents a graph signal. To solve this dimension mismatch, we resort to a well-known tool in signal processing that is often used to solve dimension mismatches: zero-padding. In essence, we keep the features learned at the $N_{1}$ selected nodes, and we fill the remainder $N-N_{1}$ nodes with $0$. Mathematically, this is simply accomplished by
-# 
-# $$ \tilde{\mathbf{x}}_{1}^{f} = \mathbf{C}_{1}^{\mathsf{T}} \mathbf{x}_{1}^{f} $$
-# 
-# which is now a zero-padded version of our layer-1 features, $\tilde{\mathbf{x}}_{1}^{f} \in \mathbb{R}^{N}$ is an $N$-dimensional signal that represents a graph signal and, as such, can be directly mapped to the graph. This zero-padded signal can thus be exchanged between nodes using the given graph $\mathbf{S}$ and we can proceed to apply a graph convolution to it
-# 
-# $$ \tilde{\mathbf{u}}_{2}^{f} = \sum_{g=1}^{F_{1}} \mathbf{H}_{2}^{fg}(\mathbf{S}) \tilde{\mathbf{x}}_{1}^{g} = \sum_{g=1}^{F_{1}} \left( \sum_{k=0}^{K_{2}-1} h_{2 k}^{fg} \mathbf{S}^{k} \tilde{\mathbf{x}}_{1}^{g} \right)  \ , \ f=1,\ldots,F_{2} $$
-# 
-# The output of this graph convolution $\tilde{\mathbf{u}}_{2}^{f} \in \mathbb{R}^{N}$ is also a graph signal defined over all of the $N$ nodes of the graph. However, we only care about the same $N_{1}$ nodes selected before, since the rest didn't carry any meaningful information. Thus, we need to downsample the output of the graph convolution again to keep only the new $F_{2}$ features at the $N_{1}$ selected nodes. We do so by
-# 
-# $$ \mathbf{u}_{2}^{f} = \mathbf{C}_{1} \tilde{\mathbf{u}}_{2}^{f} $$
-# 
-# where $\mathbf{u}_{2}^{f} \in \mathbb{R}^{N_{1}}$ are the updated $F_{2}$ features corresponding only to the  $N_{1}$ nodes selected at the output of layer $\ell=1$. It is important to note that the whole graph convolution operation can be directly written with $\mathbf{x}_{1}^{g} \in \mathbb{R}^{N_{1}}$ as input and $\mathbf{u}_{2}^{f} \in \mathbb{R}^{N_{1}}$ as output as follows
-# 
-# $$ \mathbf{u}_{2}^{f} = \mathbf{C}_{1} \sum_{g=1}^{F_{1}} \left( \sum_{k=0}^{K_{2}-1} h_{2 k}^{fg} \mathbf{S}^{k} \mathbf{C}_{1}^{\mathsf{T}} \mathbf{x}_{1}^{g} \right) = \sum_{g=1}^{F_{1}} \left( \sum_{k=0}^{K_{2}-1} h_{2 k}^{fg} \mathbf{S}_{2}^{(k)} \mathbf{x}_{1}^{g} \right)  \ , \ f=1,\ldots,F_{2} $$
-# 
-# where we defined the smaller $N_{1} \times N_{1}$ matrix $\mathbf{S}_{2}^{(k)} = \mathbf{C}_{1} \mathbf{S}^{k} \mathbf{C}_{1}^{\mathsf{T}} \in \mathbb{R}^{N_{1} \times N_{1}}$. Once we have $\mathbf{u}_{2}^{f} \in \mathbb{R}^{N_{1}}$ we can proceed to apply the pointwise nonlinearity $\sigma_{2}$ and a summarizing function $\rho_{2}(\cdot; \mathbf{S}, \alpha_{2})$ of the $\alpha_{2}$-hop neighborhood of each node, followed by a $N_{2} \times N_{1}$ downsampling matrix $\mathbf{C}_{2} \in \{0,1\}^{N_{2} \times N_{1}}$ that selects a smaller number $N_{2} < N_{1}$ of the $N_{1}$ nodes selected in the previous layer. These operations are illustrated in the above figure, where each row illustrates a layer, the first column shows the input to each layer, the second column shows the convolution operation (in the second and third row, the zero-padded nodes have been grayed out), and the third column shows the summarizing operation.
-# 
-# With this notation in place, for a general layer $\ell$, with $N_{\ell-1}$-dimensional input $\mathbf{x}_{\ell-1}^{g} \in \mathbb{R}^{N_{\ell-1}}$ described by $g=1,\ldots,F_{\ell-1}$ features, the output of the convolutional layer becomes
-# 
-# $$ \mathbf{u}_{\ell}^{f} = \sum_{g=1}^{F_{\ell-1}} \left( \sum_{k=0}^{K_{\ell}-1} h_{\ell k}^{fg} \mathbf{S}_{\ell}^{(k)} \mathbf{x}_{\ell-1}^{g} \right)  \ , \ f=1,\ldots,F_{\ell} $$
-# 
-# where the smaller $N_{\ell-1} \times N_{\ell-1}$ matrix $\mathbf{S}_{\ell}^{(k)} = \mathbf{D}_{\ell} \mathbf{S}^{k} \mathbf{D}_{\ell}^{\mathsf{T}}$ where the $N_{\ell-1} \times N$ selection matrix $\mathbf{D}_{\ell} \in \{0,1\}^{N_{\ell-1} \times N}$ keeps track of the $N_{\ell-1}$ nodes selected at layer $\ell-1$ with respect to the original $N$ nodes. This selection matrix $\mathbf{D}_{\ell}$ can be directly computed from the downsampling matrices as $\mathbf{D}_{\ell} = \mathbf{C}_{\ell-1} \mathbf{C}_{\ell-2} \cdots \mathbf{C}_{1}$. Then, we can apply the pointwise nonlinearity as
-# 
-# $$ \mathbf{v}_{\ell}^{f} = \sigma_{\ell} \left( \mathbf{u}_{\ell}^{f} \right) $$
-# 
-# and the summarizing function $\rho_{\ell}$ followed by a $N_{\ell} \times N_{\ell-1}$ downsampling matrix $\mathbf{C}_{\ell} \in \{0,1\}^{N_{\ell} \times N_{\ell-1}}$ that selects $N_{\ell} < N_{\ell-1}$ nodes out of the previous $N_{\ell-1}$ computes the output of the $\ell$th layer as
-# 
-# $$ \mathbf{x}_{\ell}^{f} = \mathbf{C}_{\ell} \rho_{\ell} \left( \mathbf{v}_{\ell}^{f} ; \mathbf{S}, \alpha_{\ell} \right) $$
-# 
-# completing the description of each layer of the selection GNN with a zero-padding pooling.
-# 
-# When using a Selection GNN, the [hyperparameters](#subsubsec:SelGNNhyper) we need to define are: the number of features on each layer $F_{\ell}$, the number of filter taps on each layer $K_{\ell}$, the number of nodes to keep at the output of each layer $N_{\ell}$, and the size of the neighborhood on which we are computing the summarizing information $\alpha_{\ell}$ (of course, we need to define the activation function $\sigma_{\ell}$ and the specific summarizing function $\rho_{\ell}$ as well).
-
-# ## Libraries <a class="anchor" id="sec:libraries"></a>
-
-# Let's start by importing the basic libraries needed. The detail is as follows: <code>os</code> is required to handle the directories to save the experiment results, <code>numpy</code> is used to create the dataset and for basic mathematical operations, <code>pickle</code> is used to save the resulting data from training, and <code>copy.deepcopy</code> is to define the architecture hyperparameter once as a dictionary and copy them to each specific architecture, changing specific hyperparameters.
-
 # In[1]:
 
 import os
@@ -551,8 +378,8 @@ hParamsSelGNN['sigma'] = nn.ReLU # Selected nonlinearity
 hParamsSelGNN['rho'] = gml.MaxPoolLocal # Summarizing function
 hParamsSelGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
 hParamsSelGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
-
-
+hParamsSelGNN['D'] = [graphTools.build_duplication_matrix(nNodes)] #List of duplication matrices used for computing the GSO by using a parameter alpha 
+hParamsSelGNN['D'] += [graphTools.build_duplication_matrix(N) for N in hParamsSelGNN['N']]
 # We have to specify the criteria by which the nodes are selected (i.e. which 10 nodes are selected after the first layer). We also follow the degree criteria (i.e. the 10 nodes with largest degree). Other criteria can be found in the corresponding explanation of Aggregation GNN.
 
 # In[30]:
@@ -685,7 +512,7 @@ trainingOptions['validationInterval'] = validationInterval
 
 G = graphTools.Graph(graphType, nNodes, graphOptions)
 
-
+assert False
 # With this initialization, the <code>Graph</code> class <code>G</code> contains several useful attributes (like the adjacency matrix, the diagonal matrix, flags to signal if the graph is undirected and has self-loops, and also the graph Laplacian -if the graph is undirected and has no self-loops-). More importantly, it has a GSO attributes <code>G.S</code> that stores the selected GSO (by default is the adjacency matrix, but can be changed by using the method <code>G.setGSO</code>; for instance, if we want to use the graph Laplacian instead, we call <code>G.setGSO(G.L)</code>).
 # 
 # Once we have created the graph (which is a realization of an SBM random graph), we can compute the GFT of the stored GSO.
