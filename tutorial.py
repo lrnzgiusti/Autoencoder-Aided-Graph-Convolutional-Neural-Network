@@ -512,7 +512,6 @@ trainingOptions['validationInterval'] = validationInterval
 
 G = graphTools.Graph(graphType, nNodes, graphOptions)
 
-assert False
 # With this initialization, the <code>Graph</code> class <code>G</code> contains several useful attributes (like the adjacency matrix, the diagonal matrix, flags to signal if the graph is undirected and has self-loops, and also the graph Laplacian -if the graph is undirected and has no self-loops-). More importantly, it has a GSO attributes <code>G.S</code> that stores the selected GSO (by default is the adjacency matrix, but can be changed by using the method <code>G.setGSO</code>; for instance, if we want to use the graph Laplacian instead, we call <code>G.setGSO(G.L)</code>).
 # 
 # Once we have created the graph (which is a realization of an SBM random graph), we can compute the GFT of the stored GSO.
@@ -723,6 +722,7 @@ costValid = {}
 
 # In[47]:
 
+assert False
 
 for thisModel in modelsGNN.keys():
     if thisModel == 'SelGNN':

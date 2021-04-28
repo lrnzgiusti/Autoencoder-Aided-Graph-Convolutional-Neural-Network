@@ -46,6 +46,8 @@ from alegnn.utils.dataTools import changeDataType
 
 zeroTolerance = 1e-9 # Absolute values below this number are considered zero.
 
+
+
 class SelectionGNN(nn.Module):
     """
     SelectionGNN: implement the selection GNN architecture
@@ -477,7 +479,37 @@ class SelectionGNN(nn.Module):
             for l in range(self.L):
                 self.GFL[3*l].addGSO(self.S)
                 self.GFL[3*l+2].addGSO(self.S)
+         
                 
+class GraphLearnGNN(SelectionGNN):
+    """
+    GraphLearnGNN: extends the concept of SelectionGNN by
+                   learning the hidden graphs structure
+    """
+    def __init__(self,
+                 # Graph filtering
+                 dimNodeSignals, nFilterTaps, bias,
+                 # Nonlinearity
+                 nonlinearity,
+                 # Pooling
+                 nSelectedNodes, poolingFunction, poolingSize,
+                 # MLP in the end
+                 dimLayersMLP,
+                 # Structure
+                 GSO,
+                 # Ordering
+                 order = None):
+        # Call the construction of SelectionGNN without the coarsening
+        
+        super().__init__( dimNodeSignals, nFilterTaps, bias, 
+                         nonlinearity,
+                         nSelectedNodes, poolingFunction, poolingSize, 
+                         dimLayersMLP,
+                         GSO, order, coarsening=False)
+        
+        
+     
+        
 class LocalActivationGNN(nn.Module):
     """
     LocalActivationGNN: implements the selection GNN architecture with a local

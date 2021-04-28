@@ -36,7 +36,6 @@ import scipy.sparse
 import scipy.spatial as sp
 from sklearn.cluster import SpectralClustering
 
-import torch; torch.set_default_dtype(torch.float64)
 import os
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
@@ -1266,10 +1265,10 @@ class Graph():
         #\\\ GSO (Graph Shift Operator):
         #   The weighted adjacency matrix by default
         self.S = self.W
-        E = build_elimination_matrix(self.N, sparse=False)
-        D = build_duplication_matrix(self.N, sparse=False)
-        self.alphaS = torch.nn.parameter.Parameter((E @ self.S.reshape(-1,1)))
-        self.Sparam = (D @ self.alphaS).reshape((self.N, self.N))
+        #E = build_elimination_matrix(self.N, sparse=False)
+        #D = build_duplication_matrix(self.N, sparse=False)
+        #self.alphaS = torch.nn.parameter.Parameter((E @ self.S.reshape(-1,1)))
+        #self.Sparam = (D @ self.alphaS).reshape((self.N, self.N))
         #\\\ GFT: Declare variables but do not compute it unless specifically
         # requested
         self.E = None # Eigenvalues
@@ -1619,83 +1618,3 @@ def permCoarsening(x, indices):
     return xnew
 
 
-
-
-def build_elimination_matrix(N : int, sparse : bool = False) -> torch.Tensor:
-    """
-    
-    Build a sparse elimination matrix
-
-    Parameters
-    ----------
-    N : int
-        The dimension of the adjacency matrix.
-
-    sparse : bool
-        Wether or not the result is sparse
-    Returns
-    -------
-    torch.sparse.FloatTensor
-        sparse representation of elimination matrix.
-
-    """
-    T = np.triu(np.ones(N))
-    f = np.where(T.flatten())[0]
-    k = N*(N+1)//2
-    nsq = N**2
-    x = f + nsq*np.arange(0,k)
-    idxs = np.unravel_index(x, (k, nsq))
-    vals = torch.ones((len(idxs[0]),), dtype=torch.float32)
-    idxs = np.row_stack(idxs)  #np.column_stack((idxs[0],idxs[1]))
-    E = torch.sparse.FloatTensor(torch.from_numpy(idxs), 
-                                    vals, 
-                                    (k, nsq)).coalesce().double()
-    if sparse:
-        return E
-    return E.to_dense()
-
-def build_duplication_matrix(N : int, sparse : bool  = False) -> torch.Tensor:
-    """
-    Build a sparse duplication matrix
-
-    Parameters
-    ----------
-    N : int
-        The dimension of the adjacency matrix.
-    sparse : bool
-        Wether or not the result is sparse
-
-    Returns
-    -------
-    torch.sparse.FloatTensor
-        sparse representation of duplication matrix.
-
-    """
-    m   = N * (N + 1) // 2;
-    nsq = N**2;
-    r   = 1;
-    a   = 1;
-    v   = np.zeros(nsq+1, dtype=np.int32);
-    for i in range(1, N+1):
-       b = i;
-       for j in range(0, i-2+1):
-          v[r] = b;
-          b    = b + N - j - 1;
-          r    = r + 1;
-       
-       for j in range(0, N-i+1):
-         v[r] = a + j;
-         r    = r + 1;
-       
-       a = a + N - i + 1;
-    v = v[1:]-1
-    rows = np.arange(0,nsq, dtype=np.int32)
-    vals = torch.ones((len(v)), dtype=torch.float32)
-    idxs = [[rows[i], v[i]] for i in range(nsq)]
-    idxs = torch.Tensor(idxs).type(torch.LongTensor).t()
-    D = torch.sparse.FloatTensor(idxs, 
-                                    vals, 
-                                    (nsq, m)).coalesce().double()
-    if sparse:
-        return D
-    return D.to_dense()
