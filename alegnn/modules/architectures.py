@@ -515,7 +515,7 @@ class GraphLearnGNN(SelectionGNN):
         self.constants = [] #list of constant used for handling the alpha<=>A
         self.S = [self.S] #list of shifts
         self.signals = []
-        for l in range(1, self.L):
+        for l in range(1,self.L):
             #init with a graph that does not exchange information with neighbors
             #We will change this during experiments
             GSO = torch.eye(self.N[l]).reshape([self.E, self.N[l], self.N[l]])
@@ -527,11 +527,10 @@ class GraphLearnGNN(SelectionGNN):
             self.register_parameter('alpha_'+str(l), alpha)
             #finally set the GSO
             self.GFL[3*l].addGSO(GSO)
-            self.GFL[3*l+2].addGSO(GSO)
             
             #register forward hook for computing the GLloss
+            self.GFL[3*l-2].register_forward_hook(self.get_activation())
             self.GFL[3*l+1].register_forward_hook(self.get_activation())
-            self.GFL[3*l+3].register_forward_hook(self.get_activation())
             
             #lists for tracking the GSOs during the training
             self.alphas.append(alpha)
@@ -539,6 +538,7 @@ class GraphLearnGNN(SelectionGNN):
             self.S.append(GSO)
             #tocca mettere il forward hook sulla relu non sul filtraggio
             
+        
     def get_activation(self):
         #See where this signals have to be cleared
         def hook(model, input, output):
@@ -547,7 +547,17 @@ class GraphLearnGNN(SelectionGNN):
         return hook
             
             
-                
+    def to(self, device):
+        # Call the parent .to() method (to move the registered parameters)
+        super(SelectionGNN, self).to(device)
+        # Move the GSO
+        for l in range(self.L):
+            self.S[l] = self.S[l].to(device)
+            self.GFL[3*l].addGSO(self.S[l])
+        #Move the alpha vector
+        for l in range(self.L-1):
+            self.alphas[l] = self.alphas[l].to(device)
+        
         
         
      

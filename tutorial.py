@@ -435,6 +435,28 @@ modelList += [hParamsSelGNN['name']]
 # 
 # The pointwise nonlinearities $\sigma$ and the pooling functions $\rho$ remain the same. As such, we just copy the same hyperparameters as the selection GNN with zero-padding. We change the name, and use the regular pooling operation provided in <code>torch.nn</code> because the graph coarsening algorithm already orders the nodes expecting them to be pooled together in contiguous fashion. We save the hyperparameters, and add it to the list.
 
+
+# In[32a]:
+hParamsGLGNN = {} # Create the dictionary to save the hyperparameters
+hParamsGLGNN['name'] = 'GLGNN' # Name the architecture
+
+hParamsGLGNN['F'] = [1, 5, 5] # Features per layer (first element is the number of input features)
+hParamsGLGNN['K'] = [3, 3] # Number of filter taps per layer
+hParamsGLGNN['bias'] = True # Decide whether to include a bias term
+hParamsGLGNN['sigma'] = nn.ReLU # Selected nonlinearity
+
+hParamsGLGNN['rho'] = gml.MaxPoolLocal # Summarizing function
+hParamsGLGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
+hParamsGLGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
+
+
+hParamsGLGNN['order'] = 'Degree'
+hParamsGLGNN['dimLayersMLP'] = [nClasses] # Dimension of the fully connected layers after the GCN layers
+
+
+writeVarValues(varsFile, hParamsGLGNN)
+modelList += [hParamsGLGNN['name']]
+
 # In[33]:
 
 
@@ -648,7 +670,7 @@ thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta
 
 #\\\ Model
 SelGNN = model.Model(thisArchit,
-                     customLoss(nn.CrossEntropyLoss, multipliers),
+                     lossFunction(),
                      thisOptim,
                      trainer,
                      evaluator,
@@ -661,6 +683,48 @@ modelsGNN[thisName] = SelGNN
 
 
 # ### Selection GNN (with graph coarsening) <a class="anchor" id="subsec:CrsGNNmodel"></a>
+
+
+# In[44a]:
+
+
+thisName = hParamsGLGNN['name']
+
+#\\\ Architecture
+thisArchit = archit.GraphLearnGNN(
+                                 hParamsGLGNN['F'],
+                                 hParamsGLGNN['K'],
+                                 hParamsGLGNN['bias'],
+                                 # Nonlinearity
+                                 hParamsGLGNN['sigma'],
+                                 # Pooling
+                                 hParamsGLGNN['N'],
+                                 hParamsGLGNN['rho'],
+                                 hParamsGLGNN['alpha'],
+                                 # MLP
+                                 hParamsGLGNN['dimLayersMLP'],
+                                 # Structure
+                                 G.S/np.max(np.real(G.E)), # Normalize adjacency
+                                 order = hParamsGLGNN['order'])
+# This is necessary to move all the learnable parameters to be
+# stored in the device (mostly, if it's a GPU)
+thisArchit.to(device)
+
+#\\\ Optimizer
+thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta1,beta2))
+
+#\\\ Model
+GLGNN = model.Model(thisArchit,
+                     customLoss(nn.CrossEntropyLoss, multipliers),
+                     thisOptim,
+                     trainer,
+                     evaluator,
+                     device,
+                     thisName,
+                     saveDir)
+
+#\\\ Add model to the dictionary
+modelsGNN[thisName] = GLGNN
 
 # In[45]:
 
@@ -725,11 +789,6 @@ costValid = {}
 assert False
 
 for thisModel in modelsGNN.keys():
-    if thisModel == 'SelGNN':
-        trainingOptions['learnGraph'] = True
-    else:
-        trainingOptions['learnGraph'] = False
-        
     print("Training model %s..." % thisModel, end = ' ', flush = True)
     
     #Train
