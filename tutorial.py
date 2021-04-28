@@ -378,8 +378,8 @@ hParamsSelGNN['sigma'] = nn.ReLU # Selected nonlinearity
 hParamsSelGNN['rho'] = gml.MaxPoolLocal # Summarizing function
 hParamsSelGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
 hParamsSelGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
-hParamsSelGNN['D'] = [graphTools.build_duplication_matrix(nNodes)] #List of duplication matrices used for computing the GSO by using a parameter alpha 
-hParamsSelGNN['D'] += [graphTools.build_duplication_matrix(N) for N in hParamsSelGNN['N']]
+#hParamsSelGNN['D'] = [graphTools.build_duplication_matrix(nNodes)] #List of duplication matrices used for computing the GSO by using a parameter alpha 
+#hParamsSelGNN['D'] += [graphTools.build_duplication_matrix(N) for N in hParamsSelGNN['N']]
 # We have to specify the criteria by which the nodes are selected (i.e. which 10 nodes are selected after the first layer). We also follow the degree criteria (i.e. the 10 nodes with largest degree). Other criteria can be found in the corresponding explanation of Aggregation GNN.
 
 # In[30]:

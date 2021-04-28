@@ -93,28 +93,8 @@ class Trainer:
         ####################################
         #     REGISTER FORWARD HOOK        #
         ####################################
-        if 'learnGraph' in kwargs.keys() and kwargs['learnGraph']:
-            def get_activation(loss):
-                def hook(model, input, output):
-                    global shift
-                    global signal
-                    shift = model.S
-                    signal = self.model.archit.sigma()(output.detach())
-                    num_nodes = shift.shape[-1]
-                    B, F, dim_signal = signal.shape
-                    signal = torch.cat((signal,
-                               torch.zeros(B, F, num_nodes-dim_signal)\
-                                       .type(signal.dtype).to(signal.device)
-                              ), dim = 2)
-                    loss.add_shift_and_signal(shift, signal)
-                return hook
+        #MOVED TO ARCHITECTURE
             
-            for l in range(0, 3*self.model.archit.L, 3):
-                #The range is so defined because we want to grab the filters
-                #which are positioned in the sequential layer onces every three 
-                # LSIGF -> Rho -> Sigma -> LSIGF -> Rho -> Sigma, ecc
-                self.model.archit.GFL[l].register_forward_hook(get_activation(self.model.loss))
-                
         
         
         ####################################

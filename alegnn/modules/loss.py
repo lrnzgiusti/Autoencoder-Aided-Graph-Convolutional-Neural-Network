@@ -64,8 +64,20 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         self.shifts.append(shift)
         self.signals.append(signal)
     
+    def add_shifts_and_signals(self, shifts, signals):
+        #add multiple shifts and signals to the respective lists
+        #once this function is called, the lists should be empty!
+        assert len(self.shifts) == 0
+        assert len(self.signals) == 0
+        self.shifts += shifts
+        self.signals += signals
+    
     def flush_shift_and_signals(self):
-        self.shifts.clear()  #TODO: capire quando va chiamata questa funzione
+        #once the loss is computed the new shifts and the new signals would be
+        #different so the respective lists have to be cleared every time
+        assert len(self.shifts) != 0
+        assert len(self.signals) != 0
+        self.shifts.clear()  
         self.signals.clear()
     
     def frobenius_norm(self, shifts, multipliers):

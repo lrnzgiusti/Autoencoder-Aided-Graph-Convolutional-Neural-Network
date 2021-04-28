@@ -41,7 +41,7 @@ import torch.nn as nn
 
 import alegnn.utils.graphML as gml
 import alegnn.utils.graphTools
-
+import alegnn.utils.graphLearningTools as glt
 from alegnn.utils.dataTools import changeDataType
 
 zeroTolerance = 1e-9 # Absolute values below this number are considered zero.
@@ -499,13 +499,55 @@ class GraphLearnGNN(SelectionGNN):
                  GSO,
                  # Ordering
                  order = None):
-        # Call the construction of SelectionGNN without the coarsening
         
+        # Call the constructor of SelectionGNN without the coarsening
         super().__init__( dimNodeSignals, nFilterTaps, bias, 
                          nonlinearity,
                          nSelectedNodes, poolingFunction, poolingSize, 
                          dimLayersMLP,
                          GSO, order, coarsening=False)
+        
+        #set the hidden graphs to have the right dimensions for avoid padding
+        #this shifts will be learned during the training
+        #the first layer is skipped since we learn only the hidden ones
+        
+        self.alphas = [] #list of alpha associated to the GSO's
+        self.constants = [] #list of constant used for handling the alpha<=>A
+        self.S = [self.S] #list of shifts
+        self.signals = []
+        for l in range(1, self.L):
+            #init with a graph that does not exchange information with neighbors
+            #We will change this during experiments
+            GSO = torch.eye(self.N[l]).reshape([self.E, self.N[l], self.N[l]])
+            #the constants will handle the GSO and alpha manipulation
+            constant = glt.Constants(self.N[l])
+            #alpha is computed as Elim x vec(S) and is shaped as [(NxN+1)/2,1]
+            alpha = constant.E @ GSO[0].reshape(-1, 1)
+            alpha = torch.nn.parameter.Parameter(alpha)
+            self.register_parameter('alpha_'+str(l), alpha)
+            #finally set the GSO
+            self.GFL[3*l].addGSO(GSO)
+            self.GFL[3*l+2].addGSO(GSO)
+            
+            #register forward hook for computing the GLloss
+            self.GFL[3*l+1].register_forward_hook(self.get_activation())
+            self.GFL[3*l+3].register_forward_hook(self.get_activation())
+            
+            #lists for tracking the GSOs during the training
+            self.alphas.append(alpha)
+            self.constants.append(constant)
+            self.S.append(GSO)
+            #tocca mettere il forward hook sulla relu non sul filtraggio
+            
+    def get_activation(self):
+        #See where this signals have to be cleared
+        def hook(model, input, output):
+            self.signals.append(output.detach())
+            
+        return hook
+            
+            
+                
         
         
      
