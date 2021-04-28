@@ -128,10 +128,90 @@ def get_diagonal_and_off_diag_idxs_fast(N: int) -> tuple:
     return torch.tensor(indeces, dtype=torch.long), \
            torch.tensor(indeces_not_diag, dtype=torch.long)
 
+def projection_onto_constraint(alpha, reciproc_indices, N):
+    r"""
+    
+    Project a vector onto the feasible set, see: arxiv:1309.1541
+    Parameters
+    ----------
+    alpha : torch.Tensor
+        vector that describes the main diagonal and upper triangular part 
+        of the adjacency matrix taken on the values
+        that fall off the main diagonal.
+        
+    reciproc_indices : torch.Tensor
+        1/j for j in [1, N*(N+1)//2-N+1)) useful for large values of N
+                      
+    N : int
+        The dimension of the adjacency matrix.
+
+    Returns
+    -------
+    alpha_pi : torch.Tensor
+        the vector alpha, taken on the values off the main diagonal
+        projected onto the feasible set .
+
+    """
+    alpha_sorted, _  = torch.sort(alpha, dim=0, descending=True)
+    cum_sum_alpha    = N/2. - torch.cumsum(alpha_sorted, dim=0) 
+    cum_mean         = torch.mul(reciproc_indices, cum_sum_alpha)
+    alpha_tilde      = torch.clamp(alpha_sorted + cum_mean, min=0) #clip
+    where            = torch.nonzero(alpha_tilde)
+    multiplier       = cum_mean[where[-1][0]]
+    return           torch.relu(alpha+multiplier)
+
+def alpha_step(alpha, constants):
+    """
+    
+    Puts the values onto the main diagonal to zero
+    Project the values onto the upper triangular part to the feasible set
+    
+    THE ORDER OF THESE OPERATIONS CHANGES THE RESULT
+
+    Parameters
+    ----------
+    alpha : torch.Tensor
+        vector that describes the main diagonal and upper triangular part 
+        of the adjacency matrix taken entirely.
+        
+    N : int
+        The dimension of the adjacency matrix.
+        
+    reciproc_indices : torch.Tensor
+        1/j for j in [1, N*(N+1)//2-N+1)) useful for large values of N
+                      
+    idx_diag : torch.Tensor // list
+      indices of the main diagonal.
+      
+    idx_not_diag : torch.Tensor // numpy array 
+      indices of the upper triangular part of the adjacency matrix.
+      
+
+    Returns
+    -------
+    This function acts inplace.
+
+    """
+    
+    
+    #project the values of alpha that are off the diagonal
+    #onto the feasible set
+    
+    alpha[constants.idx_diag] = torch.zeros((len(constants.idx_diag), 1))
+    alpha[constants.idx_not_diag] = projection_onto_constraint(alpha[constants.idx_not_diag], 
+                                                        constants.reciproc_indices, 
+                                                        constants.N )
+    
+   
+
+    
 
 
 class Constants:
+    """
+    Constants: useful constants that flows across the entire learning procedure
     
+    """
     def __init__(self, N):
         self.N = N
         
