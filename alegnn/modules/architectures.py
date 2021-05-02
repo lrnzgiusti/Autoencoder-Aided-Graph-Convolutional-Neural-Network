@@ -542,6 +542,7 @@ class GraphLearnGNN(SelectionGNN):
             alpha = constant.E @ self.S[l][0].reshape(-1, 1)
             alpha = torch.nn.parameter.Parameter(alpha)
             self.register_parameter('alpha_'+str(l), alpha)
+            #shift is computed as vec^-1(D x alpha)
             self.S[l] = (constant.D @ alpha).reshape([self.E, 
                                                       self.N[l], self.N[l]])
             self.alphas.append(alpha)
@@ -550,6 +551,9 @@ class GraphLearnGNN(SelectionGNN):
         
             
     def rebuild_shift(self, layer):
+        #Rebuild the GSO after each optimization step
+        #Since the first shift is fixed, at index 'layer-1' we have the 
+        #constants and alpha for layer indexded 'layer'
         def hook(model, input):
             D = self.constants[layer-1].D
             alpha = self.alphas[layer-1]
@@ -558,7 +562,8 @@ class GraphLearnGNN(SelectionGNN):
         return hook
     
     def get_activation(self):
-        #See where this signals have to be cleared
+        #Get the signals as the output of a layer
+        #this will called after the nonlinearity
         def hook(model, input, output):
             self.signals.append(output.detach())
             
