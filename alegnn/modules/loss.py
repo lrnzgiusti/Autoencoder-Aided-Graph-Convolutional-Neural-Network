@@ -50,35 +50,16 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         speed ups can be reached by some matrix-tensor product
     
     """
-    def __init__(self, lossFunction, multipliers):
+    def __init__(self, lossFunction, shifts, signals, multipliers):
         
         super().__init__()
         
         self.loss = lossFunction()
-        self.shifts = []
-        self.signals = []
+        self.shifts = shifts
+        self.signals = signals
         self.multipliers = {k : torch.tensor(v) 
                             for k,v in multipliers.items()}
     
-    def add_shift_and_signal(self, shift, signal):
-        self.shifts.append(shift)
-        self.signals.append(signal)
-    
-    def add_shifts_and_signals(self, shifts, signals):
-        #add multiple shifts and signals to the respective lists
-        #once this function is called, the lists should be empty!
-        assert len(self.shifts) == 0
-        assert len(self.signals) == 0
-        self.shifts += shifts
-        self.signals += signals
-    
-    def flush_shift_and_signals(self):
-        #once the loss is computed the new shifts and the new signals would be
-        #different so the respective lists have to be cleared every time
-        assert len(self.shifts) != 0
-        assert len(self.signals) != 0
-        self.shifts.clear()  
-        self.signals.clear()
     
     def frobenius_norm(self, shifts, multipliers):
         """
@@ -103,8 +84,9 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        norms = torch.tensor([norm(S, p='fro')**2 for S in shifts])
-        frobenius_penalty = multipliers @ norms
+        norms = [multipliers[h] * norm(S, p='fro')**2 
+                 for h, S in enumerate(shifts)]
+        frobenius_penalty = sum(norms)
         return frobenius_penalty
     
     def total_variation(self, shifts, signals, multipliers):
@@ -136,14 +118,17 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        traces = torch.tensor([
+        B = signals[0].shape[0] #batch size
+        #dividing for the batch size will give you the avg TV on the batches
+        traces = [ sum(
             [
-                T.trace()   
-                for T in signals[h] @ shifts[h] @ signals[h].permute(0,2,1)  
-            ] for h in range(len(signals))]
-            )
-        total_variation_penalty = multipliers @ traces
-        return total_variation_penalty.sum()
+                multipliers[h]*T.trace()   
+                for T in signal @ shifts[h] @ signal.permute(0,2,1)  
+            ]) for h, signal in enumerate(signals)
+            ]
+            
+        total_variation_penalty = sum(traces)
+        return total_variation_penalty.sum() / B
         
     def log_barrier(self, shifts, multipliers):
         """
@@ -170,16 +155,16 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
-        ones = torch.ones(shifts[0].shape[-1])
+        ones = torch.ones#(shifts[0].shape[-1])
         
         #Renz.io lo squeeze va messo perchè la tensor contraction
         #genera una dimensione in più dove non ci sono informazioni
-        log_barriers = torch.tensor([
-                                    ones.T @ log(clip((S @ ones).squeeze(0)
-                                                      , min=1e-8))
-                                    for S in shifts
-                                    ])
-        log_barrier_penalty = multipliers @ log_barriers
+        log_barriers = [
+                        multipliers[h] * ones(S.shape[-1]).T @ \
+                        log(clip((S @ ones(S.shape[-1])).squeeze(0), min=1e-8))
+                        for h, S in enumerate(shifts)
+                        ]
+        log_barrier_penalty = sum(log_barriers)
         return log_barrier_penalty
         
         
@@ -193,12 +178,12 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         log_barrier_penalty = self.log_barrier(self.shifts, 
                                                self.multipliers['gamma'])
         
-        print("CE:", self.loss(estimate, target),
+        """
+        print("\nCE:", self.loss(estimate, target),
               "\nFrob:", frobenius_penalty,
               "\nTV:", tv_penalty, 
               "\nlogB:", log_barrier_penalty)
-        
-        self.flush_shift_and_signals()
+        """
         return  self.loss(estimate, target) + \
                 frobenius_penalty + \
                 tv_penalty - \

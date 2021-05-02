@@ -515,30 +515,48 @@ class GraphLearnGNN(SelectionGNN):
         self.constants = [] #list of constant used for handling the alpha<=>A
         self.S = [self.S] #list of shifts
         self.signals = []
-        for l in range(1,self.L):
+        for l in range(1, self.L):
             #init with a graph that does not exchange information with neighbors
             #We will change this during experiments
             GSO = torch.eye(self.N[l]).reshape([self.E, self.N[l], self.N[l]])
-            #the constants will handle the GSO and alpha manipulation
-            constant = glt.Constants(self.N[l])
-            #alpha is computed as Elim x vec(S) and is shaped as [(NxN+1)/2,1]
-            alpha = constant.E @ GSO[0].reshape(-1, 1)
-            alpha = torch.nn.parameter.Parameter(alpha)
-            self.register_parameter('alpha_'+str(l), alpha)
-            #finally set the GSO
-            self.GFL[3*l].addGSO(GSO)
-            
+            #Doing this, you pass a reference to the shift so if it changes
+            #also the shift of the filter changes
+            self.S.append(GSO)
+            #finally set the GSO as the last shift of the architecture
+            self.GFL[3*l].addGSO(self.S[-1])
+            #recompute the shift before the forward
+            self.GFL[3*l].register_forward_pre_hook(self.rebuild_shift(l))
             #register forward hook for computing the GLloss
+            #the signals are taken as the output of the nonlinearity
             self.GFL[3*l-2].register_forward_hook(self.get_activation())
             self.GFL[3*l+1].register_forward_hook(self.get_activation())
             
-            #lists for tracking the GSOs during the training
+            
+            #for computing the gradients, each shift must be a function of
+            #the vector alpha which is the vector w.r.t we compute the gradient
+            #we put the into the range(1, self.L) 'cause we keep the first
+            #GSO fixed
+            #the constants will handle the GSO and alpha manipulation
+            constant = glt.Constants(self.N[l])
+            #alpha is computed as Elim x vec(S) and is shaped as [(NxN+1)/2,1]
+            alpha = constant.E @ self.S[l][0].reshape(-1, 1)
+            alpha = torch.nn.parameter.Parameter(alpha)
+            self.register_parameter('alpha_'+str(l), alpha)
+            self.S[l] = (constant.D @ alpha).reshape([self.E, 
+                                                      self.N[l], self.N[l]])
             self.alphas.append(alpha)
             self.constants.append(constant)
-            self.S.append(GSO)
-            #tocca mettere il forward hook sulla relu non sul filtraggio
-            
+    
         
+            
+    def rebuild_shift(self, layer):
+        def hook(model, input):
+            D = self.constants[layer-1].D
+            alpha = self.alphas[layer-1]
+            self.S[layer] = (D @ alpha).reshape([self.E, 
+                                                 self.N[layer], self.N[layer]])
+        return hook
+    
     def get_activation(self):
         #See where this signals have to be cleared
         def hook(model, input, output):
@@ -548,7 +566,7 @@ class GraphLearnGNN(SelectionGNN):
             
             
     def to(self, device):
-        # Call the parent .to() method (to move the registered parameters)
+        # Call the parent of .to() method (to move the registered parameters)
         super(SelectionGNN, self).to(device)
         # Move the GSO
         for l in range(self.L):
@@ -558,6 +576,11 @@ class GraphLearnGNN(SelectionGNN):
         for l in range(self.L-1):
             self.alphas[l] = self.alphas[l].to(device)
         
+    def forward(self, x):
+        
+        #we have to flush the signals every time we forward the input
+        self.signals.clear()
+        return super().forward(x)
         
         
      

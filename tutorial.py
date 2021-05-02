@@ -56,6 +56,7 @@ import alegnn.modules.model as model
 import alegnn.modules.training as training
 import alegnn.modules.evaluation as evaluation
 import alegnn.modules.loss as loss
+import alegnn.modules.optim as GLOptim
 
 
 # In[6]:
@@ -195,9 +196,7 @@ writeVarValues(varsFile, {'nTrain': nTest,
 
 # In[15]:
 
-multipliers = {"lambda" : [0.0, 0.0],
-               "gamma" : [0.0, 0.0],
-               "beta" : [0.0, 0.0]}
+
 lossFunction = nn.CrossEntropyLoss
 customLoss = loss.MultiGraphLearningLoss
 
@@ -687,7 +686,9 @@ modelsGNN[thisName] = SelGNN
 
 # In[44a]:
 
-
+multipliers = {"lambda" : [0.1, 0.1],
+               "gamma" : [0.1, 0.1],
+               "beta" : [0.1, 0.1]}
 thisName = hParamsGLGNN['name']
 
 #\\\ Architecture
@@ -711,11 +712,18 @@ thisArchit = archit.GraphLearnGNN(
 thisArchit.to(device)
 
 #\\\ Optimizer
-thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta1,beta2))
-
+thisOptim = GLOptim.MultiGraphLearningOptimizer(thisArchit.named_parameters(), 
+                                                thisArchit.constants,
+                                                lr = learningRate,
+                                                betas = (beta1,beta2),
+                                                momentum = 0.0)
+ 
 #\\\ Model
 GLGNN = model.Model(thisArchit,
-                     customLoss(nn.CrossEntropyLoss, multipliers),
+                     customLoss(nn.CrossEntropyLoss, 
+                                thisArchit.S, 
+                                thisArchit.signals,
+                                multipliers),
                      thisOptim,
                      trainer,
                      evaluator,
@@ -725,7 +733,13 @@ GLGNN = model.Model(thisArchit,
 
 #\\\ Add model to the dictionary
 modelsGNN[thisName] = GLGNN
-
+"""
+X, y = data.getSamples('train')
+arch = GLGNN.archit
+y_hat = arch(X)
+loss = GLGNN.loss
+loss_val = loss.forward(y_hat, y)
+"""
 # In[45]:
 
 
@@ -786,7 +800,7 @@ costValid = {}
 
 # In[47]:
 
-assert False
+#assert False
 
 for thisModel in modelsGNN.keys():
     print("Training model %s..." % thisModel, end = ' ', flush = True)

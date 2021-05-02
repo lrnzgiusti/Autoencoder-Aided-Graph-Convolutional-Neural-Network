@@ -254,7 +254,7 @@ class Trainer:
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
 
         # Compute gradients
-        lossValueTrain.backward()
+        lossValueTrain.backward(retain_graph=True)
 
         # Optimize
         self.model.optim.step()
@@ -385,7 +385,6 @@ class Trainer:
             randomPermutation = np.random.permutation(self.data.nTrain)
             # Convert a numpy.array of numpy.int into a list of actual int.
             idxEpoch = [int(i) for i in randomPermutation]
-
             # Learning decay
             if doLearningRateDecay:
                 learningRateScheduler.step()
