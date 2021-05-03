@@ -59,6 +59,8 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         self.signals = signals
         self.multipliers = {k : torch.tensor(v) 
                             for k,v in multipliers.items()}
+        
+        self.wrt = "both"
     
     
     def frobenius_norm(self, shifts, multipliers):
@@ -125,7 +127,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             [
                 multipliers[h]*T.trace()   
                 for T in signal @ \
-                    torch.diag(torch.sum(shifts[h], axis=1)) - shifts[h] @ \
+                    (torch.diag(torch.sum(shifts[h], axis=1).squeeze(0)) - shifts[h]) @ \
                     signal.permute(0,2,1)  
             ]) for h, signal in enumerate(signals)
             ]
@@ -190,10 +192,14 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
                                                self.multipliers['gamma'])
      
         
-        return  self.loss(estimate, target) + \
-                frobenius_penalty + \
-                tv_penalty - \
-                log_barrier_penalty
+        ce = self.loss(estimate, target)
+        graph_penalty = frobenius_penalty + tv_penalty - log_barrier_penalty
+        if self.wrt == "weights":
+            return ce
+        elif self.wrt == "graph":
+            return graph_penalty
+        return ce + graph_penalty
+                
                
 
 

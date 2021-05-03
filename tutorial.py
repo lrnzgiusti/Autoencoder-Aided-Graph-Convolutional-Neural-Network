@@ -209,7 +209,7 @@ customLoss = loss.MultiGraphLearningLoss
 
 trainer = training.Trainer
 evaluator = evaluation.evaluate
-
+multiTaskTrainer = training.MultiTaskTrainer
 
 # Next, we determine the optimizer we use with all its parameters. In our case, an ADAM optimizer, where the variables <code>beta1</code> and <code>beta2</code> are the forgetting factors $\beta_{1}$ and $\beta_{2}$.
 
@@ -725,7 +725,7 @@ GLGNN = model.Model(thisArchit,
                                 thisArchit.signals,
                                 multipliers),
                      thisOptim,
-                     trainer,
+                     multiTaskTrainer,
                      evaluator,
                      device,
                      thisName,

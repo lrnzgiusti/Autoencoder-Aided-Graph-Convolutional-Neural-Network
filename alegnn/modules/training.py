@@ -254,7 +254,7 @@ class Trainer:
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
 
         # Compute gradients
-        lossValueTrain.backward(retain_graph=True)
+        lossValueTrain.backward()
 
         # Optimize
         self.model.optim.step()
@@ -585,6 +585,58 @@ class Trainer:
             
         return trainVars
     
+class MultiTaskTrainer(Trainer):
+
+    def __init__(self, model, data, nEpochs, batchSize, **kwargs):
+        # Initialize supraclass
+        super().__init__(model, data, nEpochs, batchSize, **kwargs)
+    
+    
+    def trainBatch(self, thisBatchIndices):
+        # Get the samples
+        xTrain, yTrain = self.data.getSamples('train', thisBatchIndices)
+        xTrain = xTrain.to(self.model.device)
+        yTrain = yTrain.to(self.model.device)
+
+        # Start measuring time
+        startTime = datetime.datetime.now()
+
+        # Reset gradients
+        self.model.archit.zero_grad()
+
+        # Obtain the output of the GNN
+        yHatTrain = self.model.archit(xTrain)
+
+        # Compute loss
+        self.model.loss.wrt = "weights"
+        lossValueTrain = self.model.loss(yHatTrain, yTrain)
+
+        # Compute gradients w.r.t the cross-entropy
+        lossValueTrain.backward(retain_graph=True)
+        
+        self.model.loss.wrt = "graph"
+        lossValueTrain = self.model.loss(yHatTrain, yTrain)
+
+        # Compute gradients w.r.t the graph_penalty
+        lossValueTrain.backward()
+
+        # Optimize
+        self.model.optim.step()
+
+        # Finish measuring time
+        endTime = datetime.datetime.now()
+
+        timeElapsed = abs(endTime - startTime).total_seconds()
+
+        # Compute the accuracy
+        #   Note: Using yHatTrain.data creates a new tensor with the
+        #   same value, but detaches it from the gradient, so that no
+        #   gradient operation is taken into account here.
+        #   (Alternatively, we could use a with torch.no_grad():)
+        costTrain = self.data.evaluate(yHatTrain.data, yTrain)
+        
+        return lossValueTrain.item(), costTrain.item(), timeElapsed
+
 class TrainerSingleNode(Trainer):
     """
     TrainerSingleNode: trainer class that computes a loss over the training set

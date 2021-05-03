@@ -565,7 +565,7 @@ class GraphLearnGNN(SelectionGNN):
         #Get the signals as the output of a layer
         #this will called after the nonlinearity
         def hook(model, input, output):
-            self.signals.append(output.detach())
+            self.signals.append(output.detach().to(self.device))
             
         return hook
             
@@ -578,11 +578,12 @@ class GraphLearnGNN(SelectionGNN):
             #move GSO to device
             self.S[l] = self.S[l].to(device)
             self.GFL[3*l].addGSO(self.S[l])
-            #move signals to device
-            self.signals[l] = self.signals[l].to(device) 
         #Move the alpha vector
         for l in range(self.L-1):
             self.alphas[l] = self.alphas[l].to(device)
+            #move signals to device  
+        self.device = device #for handling the signals
+            
         
     def forward(self, x):
         
