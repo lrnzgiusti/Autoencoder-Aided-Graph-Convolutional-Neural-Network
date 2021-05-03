@@ -575,8 +575,11 @@ class GraphLearnGNN(SelectionGNN):
         super(SelectionGNN, self).to(device)
         # Move the GSO
         for l in range(self.L):
+            #move GSO to device
             self.S[l] = self.S[l].to(device)
             self.GFL[3*l].addGSO(self.S[l])
+            #move signals to device
+            self.signals[l] = self.signals[l].to(device) 
         #Move the alpha vector
         for l in range(self.L-1):
             self.alphas[l] = self.alphas[l].to(device)

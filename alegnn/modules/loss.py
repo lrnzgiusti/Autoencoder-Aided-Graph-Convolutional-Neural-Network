@@ -120,10 +120,13 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         """
         B = signals[0].shape[0] #batch size
         #dividing for the batch size will give you the avg TV on the batches
+        #L = torch.diag(torch.sum(shifts[h], axis=1)) - shifts[h]
         traces = [ sum(
             [
                 multipliers[h]*T.trace()   
-                for T in signal @ shifts[h] @ signal.permute(0,2,1)  
+                for T in signal @ \
+                    torch.diag(torch.sum(shifts[h], axis=1)) - shifts[h] @ \
+                    signal.permute(0,2,1)  
             ]) for h, signal in enumerate(signals)
             ]
             
@@ -167,28 +170,31 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         log_barrier_penalty = sum(log_barriers)
         return log_barrier_penalty
         
+    def l1_penalty(self, shifts, multipliers):
+        norms = [multipliers[h] * norm(S, p=1)
+                 for h, S in enumerate(shifts)]
+        sparsity_penalty = sum(norms)
+        return sparsity_penalty
         
     def forward(self, estimate, target):
         frobenius_penalty = self.frobenius_norm(self.shifts, 
                                                 self.multipliers['lambda'])
+        
         tv_penalty = self.total_variation(self.shifts, 
                                           self.signals, 
                                           self.multipliers['beta'])
         
+        
+        
         log_barrier_penalty = self.log_barrier(self.shifts, 
                                                self.multipliers['gamma'])
-        
-        print("\nCE:", self.loss(estimate, target),
-              "\nFrob:", frobenius_penalty,
-              "\nTV:", tv_penalty, 
-              "\nlogB:", log_barrier_penalty)
+     
         
         return  self.loss(estimate, target) + \
                 frobenius_penalty + \
                 tv_penalty - \
                 log_barrier_penalty
                
-            
 
 
 class adaptExtraDimensionLoss(nn.modules.loss._Loss):

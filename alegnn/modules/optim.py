@@ -69,13 +69,13 @@ class MultiGraphLearningOptimizer(Optimizer):
         
         #optimization algorithm for the network's parameters
         self.filters_opt = optim.Adam(self.filters_params,
-                                     lr=lr,
+                                     lr=lr*1e1,
                                      betas=betas,
                                      weight_decay=weight_decay)
         
         #optimization algorithm for the hidden graphs
         self.graphs_opt = optim.SGD(self.graphs_params, 
-                                    lr=lr*1e-1,
+                                    lr=lr*1e-2,
                                     weight_decay=weight_decay,
                                     momentum=momentum)
         #alpha step is performed using the constants object
