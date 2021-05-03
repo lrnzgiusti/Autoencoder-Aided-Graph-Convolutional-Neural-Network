@@ -178,12 +178,11 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         log_barrier_penalty = self.log_barrier(self.shifts, 
                                                self.multipliers['gamma'])
         
-        """
         print("\nCE:", self.loss(estimate, target),
               "\nFrob:", frobenius_penalty,
               "\nTV:", tv_penalty, 
               "\nlogB:", log_barrier_penalty)
-        """
+        
         return  self.loss(estimate, target) + \
                 frobenius_penalty + \
                 tv_penalty - \

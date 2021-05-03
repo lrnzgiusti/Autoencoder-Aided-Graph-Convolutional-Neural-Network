@@ -75,7 +75,7 @@ class MultiGraphLearningOptimizer(Optimizer):
         
         #optimization algorithm for the hidden graphs
         self.graphs_opt = optim.SGD(self.graphs_params, 
-                                    lr=lr,
+                                    lr=lr*1e-1,
                                     weight_decay=weight_decay,
                                     momentum=momentum)
         #alpha step is performed using the constants object
