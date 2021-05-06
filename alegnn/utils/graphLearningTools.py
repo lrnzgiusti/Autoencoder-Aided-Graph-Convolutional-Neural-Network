@@ -153,7 +153,7 @@ def projection_onto_constraint(alpha, reciproc_indices, N):
 
     """
     alpha_sorted, _  = torch.sort(alpha, dim=0, descending=True)
-    cum_sum_alpha    = N/2. - torch.cumsum(alpha_sorted, dim=0) 
+    cum_sum_alpha    = (N/2.) - torch.cumsum(alpha_sorted, dim=0) 
     cum_mean         = torch.mul(reciproc_indices, cum_sum_alpha)
     alpha_tilde      = torch.clamp(alpha_sorted + cum_mean, min=0) #clip
     where            = torch.nonzero(alpha_tilde)
@@ -201,7 +201,7 @@ def alpha_step(alpha, constants):
     alpha[constants.idx_not_diag] = projection_onto_constraint(alpha[constants.idx_not_diag], 
                                                         constants.reciproc_indices, 
                                                         constants.N )
-    
+    #alpha[constants.idx_not_diag] = torch.relu(alpha[constants.idx_not_diag])
    
 
     

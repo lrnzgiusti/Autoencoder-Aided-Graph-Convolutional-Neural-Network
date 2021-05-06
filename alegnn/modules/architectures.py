@@ -518,7 +518,7 @@ class GraphLearnGNN(SelectionGNN):
         for l in range(1, self.L):
             #init with a graph that does not exchange information with neighbors
             #We will change this during experiments
-            GSO = torch.eye(self.N[l]).reshape([self.E, self.N[l], self.N[l]])
+            GSO = torch.randn(self.N[l], self.N[l]).reshape([self.E, self.N[l], self.N[l]])
             #Doing this, you pass a reference to the shift so if it changes
             #also the shift of the filter changes
             self.S.append(GSO)
@@ -559,13 +559,14 @@ class GraphLearnGNN(SelectionGNN):
             alpha = self.alphas[layer-1]
             self.S[layer] = (D @ alpha).reshape([self.E, 
                                                  self.N[layer], self.N[layer]])
+            #print(self.S[layer])
         return hook
     
     def get_activation(self):
         #Get the signals as the output of a layer
         #this will called after the nonlinearity
         def hook(model, input, output):
-            self.signals.append(output.detach().to(self.device))
+            self.signals.append(output.detach())
             
         return hook
             

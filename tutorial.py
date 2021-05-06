@@ -227,7 +227,7 @@ beta2 = 0.999
 # In[18]:
 
 
-nEpochs = 40 # Number of epochs
+nEpochs = 10 # Number of epochs
 batchSize = 20 # Batch size
 validationInterval = 20 # How many training steps to do the validation
 
@@ -442,7 +442,7 @@ hParamsGLGNN['name'] = 'GLGNN' # Name the architecture
 hParamsGLGNN['F'] = [1, 5, 5] # Features per layer (first element is the number of input features)
 hParamsGLGNN['K'] = [3, 3] # Number of filter taps per layer
 hParamsGLGNN['bias'] = True # Decide whether to include a bias term
-hParamsGLGNN['sigma'] = nn.ReLU # Selected nonlinearity
+hParamsGLGNN['sigma'] = nn.LeakyReLU #nn.ReLU # Selected nonlinearity
 
 hParamsGLGNN['rho'] = gml.MaxPoolLocal # Summarizing function
 hParamsGLGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
@@ -686,9 +686,12 @@ modelsGNN[thisName] = SelGNN
 
 # In[44a]:
 
-multipliers = {"lambda" : [0.1, 0.1],
-               "gamma" : [0.1, 0.1],
-               "beta" : [0.1, 0.1]}
+multipliers = {"lambda" : [0.0, 0.05], #Frob
+               "gamma" : [0.0, 0.03], #Log-B
+               "beta" : [0.0, 0.05]} # TV
+
+
+
 thisName = hParamsGLGNN['name']
 
 #\\\ Architecture
@@ -716,7 +719,7 @@ thisOptim = GLOptim.MultiGraphLearningOptimizer(thisArchit.named_parameters(),
                                                 thisArchit.constants,
                                                 lr = learningRate,
                                                 betas = (beta1,beta2),
-                                                momentum = 0.0)
+                                                momentum = 0.88)
  
 #\\\ Model
 GLGNN = model.Model(thisArchit,
@@ -733,13 +736,11 @@ GLGNN = model.Model(thisArchit,
 
 #\\\ Add model to the dictionary
 modelsGNN[thisName] = GLGNN
-"""
-X, y = data.getSamples('train')
-arch = GLGNN.archit
-y_hat = arch(X)
-loss = GLGNN.loss
-loss_val = loss.forward(y_hat, y)
-"""
+#thisTrainVars = GLGNN.train(data, nEpochs, batchSize, **trainingOptions)
+#thisEvalVars = GLGNN.evaluate(data)
+#S = GLGNN.archit.S[1]
+#L = torch.diag(torch.sum(S, axis=1)).squeeze(0) - S
+#assert False
 # In[45]:
 
 
@@ -892,14 +893,14 @@ if xAxisMultiplierTrain > 1:
     selectSamplesTrain = xTrain
     # Go and fetch tem
     for thisModel in modelList:
-        lossTrain[thisModel] = lossTrain[thisModel][selectSamplesTrain]
-        costTrain[thisModel] = costTrain[thisModel][selectSamplesTrain]
+        lossTrain[thisModel] = np.log(lossTrain[thisModel][selectSamplesTrain]+1e-8)
+        costTrain[thisModel] = np.log(costTrain[thisModel][selectSamplesTrain]+1e-8)
 # And same for the validation, if necessary.
 if xAxisMultiplierValid > 1:
     selectSamplesValid = np.arange(0, len(lossValid[thisModel]),                                    xAxisMultiplierValid)
     for thisModel in modelList:
-        lossValid[thisModel] = lossValid[thisModel][selectSamplesValid]
-        costValid[thisModel] = costValid[thisModel][selectSamplesValid]
+        lossValid[thisModel] = np.log(lossValid[thisModel][selectSamplesValid]+1e-8)
+        costValid[thisModel] = np.log(costValid[thisModel][selectSamplesValid]+1e-8)
 
 
 # Plot the training and validation loss (one figure for each model)

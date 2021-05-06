@@ -69,15 +69,15 @@ class MultiGraphLearningOptimizer(Optimizer):
         
         #optimization algorithm for the network's parameters
         self.filters_opt = optim.Adam(self.filters_params,
-                                     lr=lr*1e1,
+                                     lr=lr,
                                      betas=betas,
                                      weight_decay=weight_decay)
         
         #optimization algorithm for the hidden graphs
-        self.graphs_opt = optim.SGD(self.graphs_params, 
-                                    lr=lr*1e-2,
+        self.graphs_opt = optim.Adam(self.graphs_params, 
+                                    lr=lr*1e5,
                                     weight_decay=weight_decay,
-                                    momentum=momentum)
+                                    betas=betas)
         #alpha step is performed using the constants object
         self.constants = constants 
         
@@ -87,8 +87,14 @@ class MultiGraphLearningOptimizer(Optimizer):
         #here the computational graph would be freed, in the loss call we 
         #have to specify loss.backward(retain_graph=True) or find a way
         #to avoid the release of the computationals graph variables
+        #print("\nBefore:", self.graphs_params[0], "\nGrad:", self.graphs_params[0].grad)
         self.graphs_opt.step() 
+        
         #project alpha onto the feasible set
         for i, param in enumerate(self.graphs_params):
+            #print("\nAfter Opt Step:", param)
             alpha_step(param, self.constants[i])
+            #print("\nAfter Projection", param)
+            
+        
         
