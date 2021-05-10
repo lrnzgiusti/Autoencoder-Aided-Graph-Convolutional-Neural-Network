@@ -227,7 +227,7 @@ beta2 = 0.999
 # In[18]:
 
 
-nEpochs = 10 # Number of epochs
+nEpochs = 20 # Number of epochs
 batchSize = 20 # Batch size
 validationInterval = 20 # How many training steps to do the validation
 
@@ -442,8 +442,8 @@ hParamsGLGNN['name'] = 'GLGNN' # Name the architecture
 hParamsGLGNN['F'] = [1, 5, 5] # Features per layer (first element is the number of input features)
 hParamsGLGNN['K'] = [3, 3] # Number of filter taps per layer
 hParamsGLGNN['bias'] = True # Decide whether to include a bias term
-hParamsGLGNN['sigma'] = nn.LeakyReLU #nn.ReLU # Selected nonlinearity
-
+hParamsGLGNN['sigma'] =  nn.LeakyReLU # nn.ReLU # Selected nonlinearity  #
+ 
 hParamsGLGNN['rho'] = gml.MaxPoolLocal # Summarizing function
 hParamsGLGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
 hParamsGLGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
@@ -577,6 +577,9 @@ data = alegnn.utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest, sourc
 data.astype(torch.float64)
 data.expandDims()
 
+data.samples['train']['signals'] += torch.randn_like(data.samples['train']['signals']) * 0.025
+data.samples['valid']['signals'] += torch.randn_like(data.samples['valid']['signals']) * 0.025
+data.samples['test']['signals'] += torch.randn_like(data.samples['test']['signals']) * 0.025
 
 # ## Model Initialization <a class="anchor" id="sec:modelInitialization"></a>
 # Now that we have created the dataset, and we have already defined all the hyperparameters for the architectures, and the loss function, and the optimizer that we are going to use, we can go ahead and initialize the corresponding architectures and bind them together with the loss function and the optimizer into the model.
@@ -728,7 +731,7 @@ GLGNN = model.Model(thisArchit,
                                 thisArchit.signals,
                                 multipliers),
                      thisOptim,
-                     multiTaskTrainer,
+                     trainer, #multiTaskTrainer,
                      evaluator,
                      device,
                      thisName,

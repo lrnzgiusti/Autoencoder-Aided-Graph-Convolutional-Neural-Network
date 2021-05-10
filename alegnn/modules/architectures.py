@@ -515,10 +515,16 @@ class GraphLearnGNN(SelectionGNN):
         self.constants = [] #list of constant used for handling the alpha<=>A
         self.S = [self.S] #list of shifts
         self.signals = []
+        U = torch.distributions.uniform.Uniform(0, 1)
         for l in range(1, self.L):
             #init with a graph that does not exchange information with neighbors
             #We will change this during experiments
-            GSO = torch.randn(self.N[l], self.N[l]).reshape([self.E, self.N[l], self.N[l]])
+            #GSO = torch.randn(self.N[l], self.N[l]).reshape([self.E, self.N[l], self.N[l]])
+            #GSO = scipy.sparse.csr_matrix(self.S[0][0])
+            #GSO, _ = alegnn.utils.graphTools.coarsen(GSO, levels=self.L,
+            #                                                  self_connections=False)
+            #GSO = GSO[l].todense().A.reshape([self.E, self.N[l], self.N[l]])
+            GSO = U.sample([self.N[l], self.N[l]]).reshape([self.E, self.N[l], self.N[l]])
             #Doing this, you pass a reference to the shift so if it changes
             #also the shift of the filter changes
             self.S.append(GSO)

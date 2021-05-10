@@ -63,6 +63,7 @@ class MultiGraphLearningOptimizer(Optimizer):
         #for representation purposes
         params = self.filters_params + self.graphs_params
         
+        self.params = params
         defaults = dict(lr=lr, betas=betas, eps=1e-8,
                         weight_decay=weight_decay, momentum=momentum)
         super(MultiGraphLearningOptimizer, self).__init__(params, defaults)
@@ -75,7 +76,12 @@ class MultiGraphLearningOptimizer(Optimizer):
         
         #optimization algorithm for the hidden graphs
         self.graphs_opt = optim.Adam(self.graphs_params, 
-                                    lr=lr*1e5,
+                                    lr=lr*1e2,
+                                    weight_decay=weight_decay,
+                                    betas=betas)
+        
+        self.opt = optim.Adam(self.params, 
+                                    lr=lr,
                                     weight_decay=weight_decay,
                                     betas=betas)
         #alpha step is performed using the constants object
@@ -83,18 +89,20 @@ class MultiGraphLearningOptimizer(Optimizer):
         
     @torch.no_grad()
     def step(self, closure=None):
-        self.filters_opt.step() #optimize parameters
+        #self.filters_opt.step() #optimize parameters
         #here the computational graph would be freed, in the loss call we 
         #have to specify loss.backward(retain_graph=True) or find a way
         #to avoid the release of the computationals graph variables
         #print("\nBefore:", self.graphs_params[0], "\nGrad:", self.graphs_params[0].grad)
-        self.graphs_opt.step() 
-        
+        #self.graphs_opt.step() 
+        self.opt.step()
+        alpha_step(self.params[-1], self.constants[0])
         #project alpha onto the feasible set
+        """
         for i, param in enumerate(self.graphs_params):
             #print("\nAfter Opt Step:", param)
             alpha_step(param, self.constants[i])
             #print("\nAfter Projection", param)
-            
+        """
         
         

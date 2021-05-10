@@ -194,6 +194,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         
         ce = self.loss(estimate, target)
         graph_penalty = frobenius_penalty + tv_penalty - log_barrier_penalty
+        """
         if self.wrt == "weights":
             loss = ce
             #print("\nCE:", ce)
@@ -203,6 +204,8 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             #print("Log Barrier:", log_barrier_penalty)
             loss = graph_penalty
         #print(loss)
+        """
+        loss = ce + graph_penalty
         return loss
                 
                

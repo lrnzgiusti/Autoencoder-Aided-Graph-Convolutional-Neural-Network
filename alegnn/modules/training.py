@@ -254,7 +254,7 @@ class Trainer:
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
 
         # Compute gradients
-        lossValueTrain.backward()
+        lossValueTrain.backward(retain_graph=True)
 
         # Optimize
         self.model.optim.step()
@@ -608,11 +608,11 @@ class MultiTaskTrainer(Trainer):
         yHatTrain = self.model.archit(xTrain)
 
         # Compute loss
-        #self.model.loss.wrt = "weights"
-        #lossValueTrain = self.model.loss(yHatTrain, yTrain)
+        self.model.loss.wrt = "weights"
+        lossValueTrain = self.model.loss(yHatTrain, yTrain)
 
         # Compute gradients w.r.t the cross-entropy
-        #lossValueTrain.backward(retain_graph=True)
+        lossValueTrain.backward(retain_graph=True)
         
         self.model.loss.wrt = "graph"
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
