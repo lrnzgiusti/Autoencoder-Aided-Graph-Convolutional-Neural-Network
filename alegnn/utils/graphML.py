@@ -1887,6 +1887,67 @@ class NoPool(nn.Module):
         reprString += "no neighborhood needed"
         return reprString
 
+class EncDecPool(nn.Module):
+    """
+    EncDecPool Creates a pooling layer based on autoencoder latent space
+    
+    Initialization:
+            EncDecPool(in_dim, out_dim)
+            
+    Inputs:
+            in_dim (int): number of nodes at the input
+            out_dim (int): number of nodes at the output,
+                           the AE latent space dimension
+
+        Output:
+            torch.nn.Module for an enc-dec-pooling layer.
+
+        Observation: The selected nodes for the output are ...
+        
+    The autoencoder should be trained end-to-end with the 
+    general network structure by adding the reconstruction error loss 
+    to the overall loss, probably the reconstruction error loss will 
+    be returned by some function inside the class
+    
+    """
+    def __init__(self, nInputNodes, nOutputNodes, nHops):
+
+        super().__init__()
+        self.nInputNodes = nInputNodes
+        self.nOutputNodes = nOutputNodes
+        #for a deep Autoencoder we can add one mode nonlinear bottleneck 
+        self.nQuasiLatentSpace = (nInputNodes-nOutputNodes)//2 
+        
+        
+        self.encoder_hidden_layer = nn.Linear(
+            in_features=nInputNodes, out_features=nOutputNodes
+        )
+        self.encoder_output_layer = nn.Linear(
+            in_features=nOutputNodes, out_features=nOutputNodes
+        )
+        self.decoder_hidden_layer = nn.Linear(
+            in_features=nOutputNodes, out_features=nOutputNodes
+        )
+        self.decoder_output_layer = nn.Linear(
+            in_features=nOutputNodes, out_features=nInputNodes
+        )
+        
+        
+        self.loss = nn.MSELoss()
+
+    def forward(self, x):
+        activation = self.encoder_hidden_layer(x)
+        activation = torch.relu(activation)
+        code = self.encoder_output_layer(activation)
+        code = torch.relu(code)
+        activation = self.decoder_hidden_layer(code)
+        activation = torch.relu(activation)
+        activation = self.decoder_output_layer(activation)
+        reconstructed = torch.relu(activation)
+        self.rec_error = self.loss(x, reconstructed)
+        return code
+    
+
 class MaxPoolLocal(nn.Module):
     """
     MaxPoolLocal Creates a pooling layer on graphs by selecting nodes
