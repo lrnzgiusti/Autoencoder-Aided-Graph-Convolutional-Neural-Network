@@ -622,7 +622,7 @@ thisArchit = archit.AggregationGNN(# Linear
                                    nNodes = hParamsAggGNN['nNodes'])
 
 #\\\ Optimizer
-thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta1,beta2))
+thisOptim = optim.Adam(thisArchit.parameters(), lr = 1e-2, betas = (beta1,beta2))
 
 #\\\ Model
 AggGNN = model.Model(thisArchit,
@@ -668,7 +668,7 @@ thisArchit = archit.SelectionGNN(# Graph filtering
 thisArchit.to(device)
 
 #\\\ Optimizer
-thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta1,beta2))
+thisOptim = optim.Adam(thisArchit.parameters(), lr = 1e-4, betas = (beta1,beta2))
 
 #\\\ Model
 SelGNN = model.Model(thisArchit,
@@ -720,7 +720,7 @@ thisArchit.to(device)
 #\\\ Optimizer
 thisOptim = GLOptim.MultiGraphLearningOptimizer(thisArchit.named_parameters(), 
                                                 thisArchit.constants,
-                                                lr = learningRate,
+                                                lr = 0.005,
                                                 betas = (beta1,beta2),
                                                 momentum = 0.88)
  
@@ -770,7 +770,7 @@ thisArchit = archit.SelectionGNN(# Graph filtering
 thisArchit.to(device)
 
 #\\\ Optimizer
-thisOptim = optim.Adam(thisArchit.parameters(), lr = learningRate, betas = (beta1,beta2))
+thisOptim = optim.Adam(thisArchit.parameters(), lr = 5e-5, betas = (beta1,beta2))
 
 #\\\ Model
 CrsGNN = model.Model(thisArchit,
