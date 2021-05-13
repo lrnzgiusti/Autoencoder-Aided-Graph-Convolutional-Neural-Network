@@ -444,7 +444,7 @@ hParamsGLGNN['K'] = [3, 3] # Number of filter taps per layer
 hParamsGLGNN['bias'] = True # Decide whether to include a bias term
 hParamsGLGNN['sigma'] =  nn.LeakyReLU # nn.ReLU # Selected nonlinearity  #
  
-hParamsGLGNN['rho'] = gml.MaxPoolLocal # Summarizing function
+hParamsGLGNN['rho'] = gml.EncDecPool # Summarizing function
 hParamsGLGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
 hParamsGLGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
 

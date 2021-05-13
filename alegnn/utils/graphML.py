@@ -1910,7 +1910,7 @@ class EncDecPool(nn.Module):
     be returned by some function inside the class
     
     """
-    def __init__(self, nInputNodes, nOutputNodes, nHops):
+    def __init__(self, nInputNodes, nOutputNodes, *args):# nHops):
 
         super().__init__()
         self.nInputNodes = nInputNodes
@@ -1935,6 +1935,10 @@ class EncDecPool(nn.Module):
         
         self.loss = nn.MSELoss()
 
+    def addGSO(self, S):
+        #used for compatibility issues
+        pass
+    
     def forward(self, x):
         activation = self.encoder_hidden_layer(x)
         activation = torch.relu(activation)
