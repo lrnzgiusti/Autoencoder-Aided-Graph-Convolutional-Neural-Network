@@ -1948,7 +1948,7 @@ class EncDecPool(nn.Module):
         activation = torch.relu(activation)
         activation = self.decoder_output_layer(activation)
         reconstructed = torch.relu(activation)
-        self.rec_error = self.loss(x, reconstructed)
+        self.rec_error = self.loss(x, reconstructed) 
         return code
     
 

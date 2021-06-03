@@ -42,7 +42,7 @@ def evaluate(model, data, **kwargs):
     # DATA #
     ########
 
-    xTest, yTest = data.getSamples('test')
+    xTest, yTest = data.getSamples('valid')
     xTest = xTest.to(device)
     yTest = yTest.to(device)
 

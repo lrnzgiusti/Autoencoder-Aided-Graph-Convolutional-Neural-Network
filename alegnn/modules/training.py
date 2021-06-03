@@ -89,7 +89,6 @@ class Trainer:
         self.data = data
         
         
-        
         ####################################
         #     REGISTER FORWARD HOOK        #
         ####################################
@@ -395,8 +394,8 @@ class Trainer:
                     # TODO: Actually, they might be different, so I will need to
                     # print all of them.
                     print("Epoch %d, learning rate = %.8f" % (epoch+1,
-                          learningRateScheduler.optim.param_groups[0]['lr']))
-
+                          self.model.optim.param_groups[0]['lr']))
+                    
             # Initialize counter
             batch = 0 # batch counter
             while batch < nBatches \
@@ -426,6 +425,10 @@ class Trainer:
                                 epoch+1, batch+1, costValueTrain,
                                 lossValueTrain, timeElapsed),
                             end = ' ')
+                        try:
+                            self.model.loss.eval_penalties()
+                        except:
+                            pass
                         if graphNo > -1:
                             print("[%d" % graphNo, end = '')
                             if realizationNo > -1:
@@ -1001,7 +1004,7 @@ class TrainerFlocking(Trainer):
                     # TODO: Actually, they might be different, so I will need to
                     # print all of them.
                     print("Epoch %d, learning rate = %.8f" % (epoch+1,
-                          learningRateScheduler.optim.param_groups[0]['lr']))
+                          self.model.optim.param_groups[0]['lr']))
                     
             #\\\\\\\\\\\\\\\\
             #\\\ Start DAGGER: randomEpoch

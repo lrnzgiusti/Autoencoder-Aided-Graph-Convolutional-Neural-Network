@@ -515,6 +515,7 @@ class GraphLearnGNN(SelectionGNN):
         self.constants = [] #list of constant used for handling the alpha<=>A
         self.S = [self.S] #list of shifts
         self.signals = []
+        self.enc_dec_errors = []
         U = torch.distributions.uniform.Uniform(0, 1)
         for l in range(1, self.L):
             #init with a graph that does not exchange information with neighbors
@@ -534,10 +535,11 @@ class GraphLearnGNN(SelectionGNN):
             self.GFL[3*l].register_forward_pre_hook(self.rebuild_shift(l))
             #register forward hook for computing the GLloss
             #the signals are taken as the output of the nonlinearity
-            self.GFL[3*l-2].register_forward_hook(self.get_activation())
-            self.GFL[3*l+1].register_forward_hook(self.get_activation())
+            self.GFL[3*l-1].register_forward_hook(self.get_activation()) #first layer signal
+            self.GFL[3*l-1].register_forward_hook(self.get_enc_dec_error()) #first autoencoder erros
+            self.GFL[3*l+2].register_forward_hook(self.get_enc_dec_error()) #second autoencoder erros
             
-            
+        
             #for computing the gradients, each shift must be a function of
             #the vector alpha which is the vector w.r.t we compute the gradient
             #we put the into the range(1, self.L) 'cause we keep the first
@@ -550,10 +552,11 @@ class GraphLearnGNN(SelectionGNN):
             self.register_parameter('alpha_'+str(l), alpha)
             #shift is computed as vec^-1(D x alpha)
             self.S[l] = (constant.D @ alpha).reshape([self.E, 
-                                                      self.N[l], self.N[l]])
+                                                      self.N[l], self.N[l]]).detach()
             self.alphas.append(alpha)
             self.constants.append(constant)
-    
+        for l in range(self.L):
+            self.GFL[3*l+1], self.GFL[3*l+2] = self.GFL[3*l+2], self.GFL[3*l+1]
         
             
     def rebuild_shift(self, layer):
@@ -561,21 +564,26 @@ class GraphLearnGNN(SelectionGNN):
         #Since the first shift is fixed, at index 'layer-1' we have the 
         #constants and alpha for layer indexded 'layer'
         def hook(model, input):
-            D = self.constants[layer-1].D
-            alpha = self.alphas[layer-1]
-            self.S[layer] = (D @ alpha).reshape([self.E, 
-                                                 self.N[layer], self.N[layer]])
-            #print(self.S[layer])
+            D = self.constants[layer-1].D.to(self.device)
+            self.alphas[layer-1] = self.alphas[layer-1].to(self.device)
+            self.S[layer] = (D @ self.alphas[layer-1]).reshape([self.E, 
+                                                 self.N[layer], self.N[layer]]).to(self.device)
+            self.GFL[3*layer].addGSO(self.S[layer])
         return hook
     
     def get_activation(self):
         #Get the signals as the output of a layer
         #this will called after the nonlinearity
         def hook(model, input, output):
-            self.signals.append(output.detach())
-            
+            self.signals.append(output.detach().to(self.device))
         return hook
             
+    def get_enc_dec_error(self):
+        #Get the signals as the output of a layer
+        #this will called after the nonlinearity
+        def hook(model, input, output):
+            self.enc_dec_errors.append(model.rec_error)
+        return hook
             
     def to(self, device):
         # Call the parent of .to() method (to move the registered parameters)
@@ -587,7 +595,8 @@ class GraphLearnGNN(SelectionGNN):
             self.GFL[3*l].addGSO(self.S[l])
         #Move the alpha vector
         for l in range(self.L-1):
-            self.alphas[l] = self.alphas[l].to(device)
+            pass
+            #self.alphas[l] = self.alphas[l].cpu()
             #move signals to device  
         self.device = device #for handling the signals
             
@@ -596,6 +605,7 @@ class GraphLearnGNN(SelectionGNN):
         
         #we have to flush the signals every time we forward the input
         self.signals.clear()
+        self.enc_dec_errors.clear()
         return super().forward(x)
         
         

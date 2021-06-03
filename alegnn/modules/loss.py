@@ -50,17 +50,17 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         speed ups can be reached by some matrix-tensor product
     
     """
-    def __init__(self, lossFunction, shifts, signals, multipliers):
+    def __init__(self, lossFunction, shifts, signals, enc_dec_errors ,multipliers):
         
         super().__init__()
         
         self.loss = lossFunction()
         self.shifts = shifts
         self.signals = signals
+        self.enc_dec_errors = enc_dec_errors
         self.multipliers = {k : torch.tensor(v) 
                             for k,v in multipliers.items()}
         
-        self.wrt = "both"
     
     
     def frobenius_norm(self, shifts, multipliers):
@@ -86,6 +86,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
+        
         norms = [multipliers[h] * norm(S, p='fro')**2 
                  for h, S in enumerate(shifts)]
         frobenius_penalty = sum(norms)
@@ -120,6 +121,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             scaled by their respective multipliers
 
         """
+
         B = signals[0].shape[0] #batch size
         #dividing for the batch size will give you the avg TV on the batches
         #L = torch.diag(torch.sum(shifts[h], axis=1)) - shifts[h]
@@ -127,7 +129,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
             [
                 multipliers[h]*T.trace()   
                 for T in signal @ \
-                    (torch.diag(torch.sum(shifts[h], axis=1).squeeze(0)) - shifts[h]) @ \
+                    (torch.diag(torch.sum(shifts[h+1], axis=1).squeeze(0)) - shifts[h+1]) @ \
                     signal.permute(0,2,1)  
             ]) for h, signal in enumerate(signals)
             ]
@@ -166,19 +168,20 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         #genera una dimensione in più dove non ci sono informazioni
         log_barriers = [
                         multipliers[h] * ones(S.shape[-1]).T @ \
-                        log(clip((S @ ones(S.shape[-1])).squeeze(0), min=1e-8))
+                        log(clip((S.cpu() @ ones(S.shape[-1])).squeeze(0), min=1e-8))
                         for h, S in enumerate(shifts)
                         ]
         log_barrier_penalty = sum(log_barriers)
         return log_barrier_penalty
         
-    def l1_penalty(self, shifts, multipliers):
-        norms = [multipliers[h] * norm(S, p=1)
-                 for h, S in enumerate(shifts)]
-        sparsity_penalty = sum(norms)
-        return sparsity_penalty
+    def enc_dec_penalty(self, enc_dec_errors, multipliers):
+        errors = [multipliers[h] * err
+                 for h, err in enumerate(enc_dec_errors)]
+        enc_dec_penalties = sum(errors)
+        return enc_dec_penalties
         
     def forward(self, estimate, target):
+
         frobenius_penalty = self.frobenius_norm(self.shifts, 
                                                 self.multipliers['lambda'])
         
@@ -193,21 +196,49 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
      
         
         ce = self.loss(estimate, target)
+        self.ce = ce
         graph_penalty = frobenius_penalty + tv_penalty - log_barrier_penalty
-        """
-        if self.wrt == "weights":
-            loss = ce
-            #print("\nCE:", ce)
-        elif self.wrt == "graph":
-            #print("\nFrob:", frobenius_penalty)
-            #print("TV:", tv_penalty)
-            #print("Log Barrier:", log_barrier_penalty)
-            loss = graph_penalty
-        #print(loss)
-        """
-        loss = ce + graph_penalty
+        enc_dec_error = self.enc_dec_penalty(self.enc_dec_errors, self.multipliers['eta'])
+
+        
+        loss = ce + graph_penalty + enc_dec_error
         return loss
                 
+    def eval_penalties(self):
+        ce = self.ce
+        frobenius_penalty = self.frobenius_norm(self.shifts, 
+                                                self.multipliers['lambda'])
+        
+        tv_penalty = self.total_variation(self.shifts, 
+                                          self.signals, 
+                                          self.multipliers['beta'])
+        
+        
+        log_barrier_penalty = self.log_barrier(self.shifts, 
+                                               self.multipliers['gamma'])
+     
+        
+        graph_penalty = frobenius_penalty + tv_penalty - log_barrier_penalty
+        enc_dec_error = self.enc_dec_penalty(self.enc_dec_errors, self.multipliers['eta'])
+
+        print("CE:", round(ce.item(), 9), end=' ')
+        print("AE:", round(enc_dec_error.item(), 9), end=' ')
+        print("Frob:", round(frobenius_penalty.item(), 9), end=' ')
+        print("TV:", round(tv_penalty.item(), 9), end=' ')
+        print("Log Barrier:", round(-log_barrier_penalty.item(), 9), end=' ')
+
+
+    def extra_repr(self):
+        reprString = ""
+        reprString += "(Total Variation): "
+        reprString += str(self.multipliers['beta'].numpy()) + "\n"
+        reprString += "(Frobenius Norm): "
+        reprString += str(self.multipliers['lambda'].numpy()) + "\n"
+        reprString += "(Log Barrier): "
+        reprString += str(self.multipliers['gamma'].numpy()) + "\n"
+        reprString += "(Autoencoder): "
+        reprString += str(self.multipliers['eta'].numpy())
+        return reprString
                
 
 

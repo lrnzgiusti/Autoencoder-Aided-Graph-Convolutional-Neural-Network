@@ -4,6 +4,10 @@
 # In[1]:
 
 import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
+os.environ["CUDA_VISIBLE_DEVICES"]="3" 
+
 import numpy as np
 import pickle
 import datetime
@@ -12,7 +16,7 @@ from copy import deepcopy
 
 # Next, we import <code>matplotlib</code> to be able to plot the loss and evaluation measures after training. Note that <code>matplotlib</code> is configured to use LaTeX, so a corresponding LaTeX installation is required. If not, please comment the appropriate lines.
 
-# In[2]:
+# In[2]:q
 
 
 import matplotlib
@@ -28,9 +32,14 @@ plt.style.use('ggplot')
 
 
 import torch; torch.set_default_dtype(torch.float64)
+torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 import torch.optim as optim
 
+import random
+#np.random.seed(10220033)
+#random.seed(10220033)
+#torch.manual_seed(10220033)
 
 # Finally, we import the core libraries that have all the required classes and functions to run the graph neural networks.
 # 
@@ -227,7 +236,7 @@ beta2 = 0.999
 # In[18]:
 
 
-nEpochs = 20 # Number of epochs
+nEpochs = 10 # Number of epochs
 batchSize = 20 # Batch size
 validationInterval = 20 # How many training steps to do the validation
 
@@ -284,7 +293,7 @@ hParamsAggGNN['Nmax'] = None # If 'None' sets maxN equal to the size
 # In[22]:
 
 
-hParamsAggGNN['order'] = 'Degree'
+hParamsAggGNN['order'] = 'SpectralProxies' #'Degree'
 
 
 # Now that we have set the hyperparameters to build the aggregation sequence $\mathbf{z}_{i}^{f}$ we [recall](#subsubsec:AggGNN) that this sequence offers a regular structure, since consecutive elements of this vector represent information from consecutive neighborhoods in the graph. Thus, if we have a regular structure, we can go ahead and apply a regular convolutional layer, and regular pooling.
@@ -340,6 +349,13 @@ modelList += [hParamsAggGNN['name']]
 # 
 # What we learn through the selection GNN are the $K_{\ell}$ filter coefficients $\{h_{\ell k}^{fg} \}$ corresponding to the $F_{\ell}F_{\ell-1}$ filter banks that we have at layer $\ell$. So, for each layer, we need to specify: the number of input features $F_{\ell-1}$, the number of output features $F_{\ell}$, and the number of filter taps $K_{\ell}$. The input to the first layer is $\tilde{\mathbf{x}}_{0}^{f} = \mathbf{x}^{f}$ and, again, we have $F_{0}=F=1$ input features. In this case in particular, we consider a two-layer selection GNN, where in the first layer we output $F_{1} = 5$ features, and in the second output also $F_{2} =5$ features. The number of filter taps is $K_{1} = K_{2} = 3$ on each layer (information up to the $2$-hop neighborhood).
 
+# In[26a]:
+# Finally, once we have determined the convolutional layers, with their nonlinearities and pooling, we apply a simple one-layer MLP (i.e. a fully connected layer) to adapt the output dimension to have a total number of features equal to the number of classes (if we want to apply a deeper MLP, we add more elements to the list, each element determining how many output features after each fully connected layer, and we note that the nonlinearity applied between the layers is the same determined before; the last layer has no nonlinearity applied since the softmax is applied by the loss function).
+
+# In[25]:
+
+
+
 # In[27]:
 
 
@@ -384,7 +400,7 @@ hParamsSelGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer 
 # In[30]:
 
 
-hParamsSelGNN['order'] = 'Degree'
+hParamsSelGNN['order'] = 'SpectralProxies' #'Degree'
 
 
 # After defining the hyperparameters of the graph convolutional layers, we apply a final MLP layer to adapt the dimensions to that of the number of classes (if we want to apply a deeper MLP, we add more elements to the list, each element determining how many output features after each fully connected layer, and we note that the nonlinearity applied between the layers is the same determined before in <code>hParamsSelGNN['sigma']</code>; the last layer has no nonlinearity applied since the softmax is applied by the loss function).
@@ -449,7 +465,7 @@ hParamsGLGNN['alpha'] = [2, 3] # alpha-hop neighborhood that
 hParamsGLGNN['N'] = [10, 5] # Number of nodes to keep at the end of each layer is affected by the summary
 
 
-hParamsGLGNN['order'] = 'Degree'
+hParamsGLGNN['order'] = 'SpectralProxies' #'Degree' OBSOLETE
 hParamsGLGNN['dimLayersMLP'] = [nClasses] # Dimension of the fully connected layers after the GCN layers
 
 
@@ -476,7 +492,7 @@ modelList += [hParamsCrsGNN['name']]
 
 
 # Parameters:
-printInterval = 0 # After how many training steps, print the partial results
+printInterval = 100 # After how many training steps, print the partial results
     # if 0 never print training partial results.
 xAxisMultiplierTrain = 100 # How many training steps in between those shown in
     # the plot, i.e., one training step every xAxisMultiplierTrain is shown.
@@ -577,9 +593,9 @@ data = alegnn.utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest, sourc
 data.astype(torch.float64)
 data.expandDims()
 
-data.samples['train']['signals'] += torch.randn_like(data.samples['train']['signals']) * 0.025
-data.samples['valid']['signals'] += torch.randn_like(data.samples['valid']['signals']) * 0.025
-data.samples['test']['signals'] += torch.randn_like(data.samples['test']['signals']) * 0.025
+#data.samples['train']['signals'] += torch.randn_like(data.samples['train']['signals']) * 0.025
+#data.samples['valid']['signals'] += torch.randn_like(data.samples['valid']['signals']) * 0.025
+#data.samples['test']['signals'] += torch.randn_like(data.samples['test']['signals']) * 0.025
 
 # ## Model Initialization <a class="anchor" id="sec:modelInitialization"></a>
 # Now that we have created the dataset, and we have already defined all the hyperparameters for the architectures, and the loss function, and the optimizer that we are going to use, we can go ahead and initialize the corresponding architectures and bind them together with the loss function and the optimizer into the model.
@@ -621,6 +637,7 @@ thisArchit = archit.AggregationGNN(# Linear
                                    maxN = hParamsAggGNN['Nmax'],
                                    nNodes = hParamsAggGNN['nNodes'])
 
+thisArchit.to(device)
 #\\\ Optimizer
 thisOptim = optim.Adam(thisArchit.parameters(), lr = 1e-2, betas = (beta1,beta2))
 
@@ -641,6 +658,69 @@ modelsGNN[thisName] = AggGNN
 # Do not forget to initialize the loss function before binding it within the <code>model</code> class. Recall that if more than one node is selected by setting <code>hParamsAggGNN['nNodes']</code> greater than one, then the output of the architecture will be another graph signal with the number of features learned by each node. If we want to further consolidate this features into a single, centralized feature, we need to further define another MLP <code>hParamsAggGNN['dimLayersAggMLP']</code> that acts on the concatenation of the features learned by all nodes to learn a single set of features (typically, the number of classes). This is invoked by key argument <code>dimLayersAggMLP = </code>, which otherwise is set to an empty list <code>[]</code> by default. If the number of nodes selected is 1, then the output is not a graph signal but just the collection of features collected at that node (and can be readily used, for instance, for classification).
 
 # ### Selection GNN (with zero-padding) <a class="anchor" id="subsec:SelGNNmodel"></a>
+
+# In[43a]:
+
+hParamsMultiGNN = {}
+hParamsMultiGNN['name'] = 'MultiGNN'
+hParamsMultiGNN['nSelectedNodes'] = [10, 5]
+hParamsMultiGNN['nShifts'] = [7, 5]
+
+hParamsMultiGNN['F'] = [[1, 5], [5, 5]] # Features per layer (the first element is the number of input features)
+hParamsMultiGNN['K'] = [[2], [2]]  # Number of filter taps per layer
+hParamsMultiGNN['bias'] = True # Decide whether to include a bias term
+
+
+hParamsMultiGNN['sigma'] = nn.ReLU # Selected nonlinearity
+hParamsMultiGNN['rho'] = nn.MaxPool1d # Pooling function
+hParamsMultiGNN['alpha'] = [[2], [2]] # Size of pooling function
+hParamsMultiGNN['order'] = 'Degree'
+
+hParamsMultiGNN['dimLayersMLP'] =  [nClasses]
+
+
+
+writeVarValues(varsFile, hParamsMultiGNN)
+modelList += [hParamsMultiGNN['name']]  
+
+thisName = hParamsMultiGNN['name']
+
+#\\\ Architecture
+thisArchit = archit.MultiNodeAggregationGNN(# Linear
+                                   hParamsMultiGNN['nSelectedNodes'],
+                                   hParamsMultiGNN['nShifts'],
+                                   hParamsMultiGNN['F'],
+                                   hParamsMultiGNN['K'],
+                                   hParamsMultiGNN['bias'],
+                                   # Nonlinearity
+                                   hParamsMultiGNN['sigma'],
+                                   # Pooling
+                                   hParamsMultiGNN['rho'],
+                                   hParamsMultiGNN['alpha'],
+                                   # MLP in the end
+                                   hParamsMultiGNN['dimLayersMLP'],
+                                   # Structure
+                                   G.S/np.max(np.diag(G.E)), # Normalize the adjacency matrix
+                                   order = hParamsMultiGNN['order'])
+
+
+thisArchit.to(device)
+#\\\ Optimizer
+
+thisOptim = optim.Adam(thisArchit.parameters(), lr = 1e-2, betas = (beta1,beta2))
+
+#\\\ Model
+MultiGNN = model.Model(thisArchit,
+                     lossFunction(),
+                     thisOptim,
+                     trainer,
+                     evaluator,
+                     device,
+                     thisName,
+                     saveDir)
+
+#\\\ Add model to the dictionary
+modelsGNN[thisName] = MultiGNN
 
 # In[44]:
 
@@ -691,7 +771,8 @@ modelsGNN[thisName] = SelGNN
 
 multipliers = {"lambda" : [0.0, 0.05], #Frob
                "gamma" : [0.0, 0.03], #Log-B
-               "beta" : [0.0, 0.05]} # TV
+               "beta" : [0.0, 0.05],
+               "eta" :0.02} # TV
 
 
 
@@ -720,7 +801,7 @@ thisArchit.to(device)
 #\\\ Optimizer
 thisOptim = GLOptim.MultiGraphLearningOptimizer(thisArchit.named_parameters(), 
                                                 thisArchit.constants,
-                                                lr = 0.005,
+                                                lr = 0.007,
                                                 betas = (beta1,beta2),
                                                 momentum = 0.88)
  
@@ -729,6 +810,7 @@ GLGNN = model.Model(thisArchit,
                      customLoss(nn.CrossEntropyLoss, 
                                 thisArchit.S, 
                                 thisArchit.signals,
+                                thisArchit.enc_dec_errors,
                                 multipliers),
                      thisOptim,
                      trainer, #multiTaskTrainer,
@@ -739,6 +821,7 @@ GLGNN = model.Model(thisArchit,
 
 #\\\ Add model to the dictionary
 modelsGNN[thisName] = GLGNN
+
 #thisTrainVars = GLGNN.train(data, nEpochs, batchSize, **trainingOptions)
 #thisEvalVars = GLGNN.evaluate(data)
 #S = GLGNN.archit.S[1]
@@ -804,8 +887,9 @@ costValid = {}
 
 # In[47]:
 
-#assert False
-
+#modelList = ['AggGNN', 'MultiGNN', 'GLGNN']
+#del modelsGNN['SelGNN']
+#del modelsGNN['CrsGNN']
 for thisModel in modelsGNN.keys():
     print("Training model %s..." % thisModel, end = ' ', flush = True)
     
@@ -986,3 +1070,14 @@ allEvalValid.savefig(os.path.join(saveDirFigs,'allEvalValid.pdf'),
 # This concludes the tutorial. The main objective was to introduce the basic call to the architectures. Additionally, we reviewed the classes for graphs and datasets that could be useful. In particular, the data class has important attributes and methods that can work in tandem with training multiple models.
 # 
 # While only three architectures were overviewed in this tutorial, many more are available in <code>Modules.architectures</code>. Additionally, the <code>nn.Module</code>s defined in <code>Utils.graphML</code> can serve as basic layers for building other graph neural network architectures tailored to specific needs, hopefully in the same way as the layers in <code>torch.nn</code> are typically used.
+# In[80]:
+import json
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+    
+json.dump(costValid, open('Err_'+str(np.random.randint(0,1000))+'.json', 'w'), indent=4, cls=NumpyEncoder)

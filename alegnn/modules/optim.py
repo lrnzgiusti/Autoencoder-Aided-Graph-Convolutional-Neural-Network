@@ -96,7 +96,10 @@ class MultiGraphLearningOptimizer(Optimizer):
         #print("\nBefore:", self.graphs_params[0], "\nGrad:", self.graphs_params[0].grad)
         #self.graphs_opt.step() 
         self.opt.step()
-        alpha_step(self.params[-1], self.constants[0])
+        p = self.params[-1].cpu().data
+        alpha_step(p, self.constants[0])
+        self.params[-1].data.copy_(p)
+        
         #project alpha onto the feasible set
         """
         for i, param in enumerate(self.graphs_params):

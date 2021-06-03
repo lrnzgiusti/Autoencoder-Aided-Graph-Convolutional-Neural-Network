@@ -196,12 +196,12 @@ def alpha_step(alpha, constants):
     
     #project the values of alpha that are off the diagonal
     #onto the feasible set
-    
+    #alpha_ = alpha.detach()
     alpha[constants.idx_diag] = torch.zeros((len(constants.idx_diag), 1))
     alpha[constants.idx_not_diag] = projection_onto_constraint(alpha[constants.idx_not_diag], 
                                                         constants.reciproc_indices, 
                                                         constants.N )
-    #alpha[constants.idx_not_diag] = torch.relu(alpha[constants.idx_not_diag])
+    #return alpha_
    
 
     
@@ -220,8 +220,8 @@ class Constants:
         self.reciproc_indices = self.compute_one_store_forever(N)
 
     def compute_one_store_forever(self, N):
-        duplication = build_duplication_matrix(N)
-        elimination = build_elimination_matrix(N)
+        duplication = build_duplication_matrix(N, sparse=True)
+        elimination = build_elimination_matrix(N, sparse=True)
         idx_diag, idx_not_diag = get_diagonal_and_off_diag_idxs_fast(N)
         reciproc_indices = torch.Tensor([1/j for j in range(1,N*(N+1)//2-N+1)])\
                                 .reshape((N*(N+1)//2-N,1))

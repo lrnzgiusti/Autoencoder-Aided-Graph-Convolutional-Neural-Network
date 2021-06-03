@@ -4505,13 +4505,13 @@ class TextDataset(object):
                 def __iter__(self):
                     for document in self.documents:
                         yield document.split()
-            model = gensim.models.Word2Vec(Sentences(self.documents), size=size)
+            model = gensim.models.Word2Vec(Sentences(self.documents), vector_size=size)
         self.embeddings = np.empty((len(self.vocab), size))
         keep = []
         not_found = 0
         for i,word in enumerate(self.vocab):
             try:
-                self.embeddings[i,:] = model[word]
+                self.embeddings[i,:] = model.wv[word]
                 keep.append(i)
             except KeyError:
                 not_found += 1
