@@ -772,7 +772,7 @@ modelsGNN[thisName] = SelGNN
 multipliers = {"lambda" : [0.0, 0.05], #Frob
                "gamma" : [0.0, 0.03], #Log-B
                "beta" : [0.0, 0.05],
-               "eta" :0.02} # TV
+               "eta" : [0.02, 0.02]} # TV
 
 
 
@@ -891,6 +891,8 @@ costValid = {}
 #del modelsGNN['SelGNN']
 #del modelsGNN['CrsGNN']
 for thisModel in modelsGNN.keys():
+    if thisModel != 'GLGNN':
+        continue
     print("Training model %s..." % thisModel, end = ' ', flush = True)
     
     #Train

@@ -175,7 +175,7 @@ class MultiGraphLearningLoss(nn.modules.loss._Loss):
         return log_barrier_penalty
         
     def enc_dec_penalty(self, enc_dec_errors, multipliers):
-        errors = [multipliers[h] * err
+        errors = [multipliers[h] * err.item()
                  for h, err in enumerate(enc_dec_errors)]
         enc_dec_penalties = sum(errors)
         return enc_dec_penalties
