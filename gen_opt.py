@@ -30,7 +30,7 @@ import os
 import sys
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
-os.environ["CUDA_VISIBLE_DEVICES"]=sys.argv[1] 
+os.environ["CUDA_VISIBLE_DEVICES"]=""#sys.argv[1] 
 
 import numpy as np
 import matplotlib
@@ -71,7 +71,7 @@ startRunTime = datetime.datetime.now()
 #                                                                   #
 #####################################################################
 
-graphType = sys.argv[2]  # Type of graph: 'SBM', 'FacebookEgo', 'SmallWorld'
+graphType = "SBM" # sys.argv[2]  # Type of graph: 'SBM', 'FacebookEgo', 'SmallWorld'
 
 thisFilename = 'sourceLocGNN' # This is the general name of all related files
 
@@ -175,7 +175,7 @@ lossFunction = nn.CrossEntropyLoss # This applies a softmax before feeding
     # it into the NLL, so we don't have to apply the softmax ourselves.
 
 #\\\ Overall training options
-nEpochs = 40 # Number of epochs
+nEpochs = 5 # Number of epochs
 batchSize = 64 # Batch size
 doLearningRateDecay = False # Learning rate decay
 learningRateDecayRate = 0.9 # Rate
@@ -203,13 +203,13 @@ writeVarValues(varsFile,
 # orderings.    
 
 # Select pooling options (node ordering for zero-padding)
-doDegree = True
-doSpectralProxies = True
-doEDS = True
-doCoarsening = True
+doDegree = False
+doSpectralProxies = False
+doEDS = False
+doCoarsening = False
 
 # Select desired architectures
-doSelectionGNN = True
+doSelectionGNN = False
 doAggregationGNN = False
 doMultinodeGNN = False
 doGraphLearnGNN = True
@@ -254,7 +254,7 @@ if doGraphLearnGNN:
     modelGLGNN['nonlinearity'] = nn.ReLU
     # Pooling
     modelGLGNN['nSelectedNodes'] = [10, 10] # Number of nodes to keep
-    modelGLGNN['poolingFunction'] = gml.EncDecPool # Summarizing function
+    modelGLGNN['poolingFunction'] = gml.TransformerPool # Summarizing function
     modelGLGNN['poolingSize'] = [6, 8] # Summarizing neighborhoods
     # Readout layer
     modelGLGNN['dimLayersMLP'] = [nClasses]
@@ -595,7 +595,7 @@ doLogging = False # Log into tensorboard
 doSaveVars = True # Save (pickle) useful variables
 doFigs = True # Plot some figures (this only works if doSaveVars is True)
 # Parameters:
-printInterval = 0 # After how many training steps, print the partial results
+printInterval = 10 # After how many training steps, print the partial results
 xAxisMultiplierTrain = 100 # How many training steps in between those shown in
     # the plot, i.e., one training step every xAxisMultiplierTrain is shown.
 xAxisMultiplierValid = 10 # How many validation steps in between those shown,
@@ -841,7 +841,7 @@ for graph in range(nGraphRealizations):
             # to B x 1 x N
 
 
-        data.samples['train']['signals'] += torch.randn_like(data.samples['train']['signals']) * data.samples['train']['signals'].std() / float(sys.argv[3])
+        data.samples['train']['signals'] += 0 #torch.randn_like(data.samples['train']['signals']) * data.samples['train']['signals'].std() / float(sys.argv[3])
         
 
         #%%##################################################################

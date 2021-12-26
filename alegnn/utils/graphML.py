@@ -1887,6 +1887,53 @@ class NoPool(nn.Module):
         reprString += "no neighborhood needed"
         return reprString
 
+class TransformerPool(nn.Module):
+    """
+    TransformerPool Creates a pooling layer based on TranformerEncoder latent space
+    
+    Initialization:
+            TransformerPool(in_dim, out_dim)
+            
+    Inputs:
+            in_dim (int): number of nodes at the input
+            out_dim (int): number of nodes at the output,
+                           the Transformer latent space dimension
+
+        Output:
+            torch.nn.Module for an transformer-pooling layer.
+
+        Observation: The selected nodes for the output are ...
+        
+    The transformer should be trained end-to-end with the 
+    general network structure by adding the reconstruction error loss 
+    to the overall loss, probably the reconstruction error loss will 
+    be returned by some function inside the class
+    
+    """
+    def __init__(self, nInputNodes, nOutputNodes, *args):# nHops):
+
+        super().__init__()
+        self.transformer = nn.Transformer(d_model=nInputNodes, 
+                                           nhead=1, 
+                                           num_encoder_layers=1, 
+                                           num_decoder_layers=1, 
+                                           dim_feedforward=nOutputNodes, 
+                                           batch_first=True)
+
+        
+        
+        self.loss = nn.MSELoss()
+
+    def addGSO(self, S):
+        #used for compatibility issues
+        pass
+    
+    def forward(self, x):
+        activation = self.transformer.encoder.layers[0].linear1(x)
+        code = torch.relu(activation)
+        self.rec_error = self.loss(x, self.transformer(x,x)) 
+        return code
+
 class EncDecPool(nn.Module):
     """
     EncDecPool Creates a pooling layer based on autoencoder latent space

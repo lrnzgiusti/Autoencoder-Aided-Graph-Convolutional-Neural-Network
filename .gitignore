@@ -4,3 +4,6 @@
 experiments/*
 experiments
 datasets/*
+*/*/__pycache__
+*/__Pycache__
+__pycache__
