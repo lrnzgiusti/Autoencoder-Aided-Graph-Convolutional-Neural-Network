@@ -212,8 +212,8 @@ doCoarsening = False
 doSelectionGNN = False
 doAggregationGNN = False
 doMultinodeGNN = False
-doGraphLearnGNN = True
-
+doGraphLearnGNN = False
+doMeganFox = True
 # In this section, we determine the (hyper)parameters of models that we are
 # going to train. This only sets the parameters. The architectures need to be
 # created later below. Do not forget to add the name of the architecture
@@ -280,6 +280,59 @@ if doGraphLearnGNN:
     modelGLGNN['evaluator'] = evaluation.evaluate    
     writeVarValues(varsFile, modelGLGNN)
     modelList += [modelGLGNN['name']]
+    
+attention = True
+if doMeganFox:
+    modelGLGNN = {}
+    modelGLGNN['name'] = 'GLGNN' # To be modified later on depending on the
+        # specific ordering selected
+    modelGLGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
+                                     else 'cpu'
+                                     
+    #\\\ ARCHITECTURE
+        
+    # Select architectural nn.Module to use
+    modelGLGNN['archit'] = archit.adaptiveGraphLearnGNN
+    modelGLGNN['baseModel'] =  archit.GraphAttentionNetwork if attention else archit.SelectionGNN 
+    # Graph convolutional layers
+    modelGLGNN['dimNodeSignals'] = [1, 32, 32] # Number of features per layer
+    if attention:
+        modelGLGNN['nAttentionHeads'] = [3,3]
+    else:
+        modelGLGNN['nFilterTaps'] = [5, 5]
+    modelGLGNN['bias'] = True # Include bias
+    # Nonlinearity
+    modelGLGNN['nonlinearity'] = nn.ReLU if not attention else torch.nn.functional.relu
+    # Pooling
+    modelGLGNN['nSelectedNodes'] = [10, 10] # Number of nodes to keep
+    modelGLGNN['poolingFunction'] = gml.TransformerPool # Summarizing function
+    modelGLGNN['poolingSize'] = [6, 8] # Summarizing neighborhoods
+    # Readout layer
+    modelGLGNN['dimLayersMLP'] = [nClasses]
+    # Graph Structure
+    modelGLGNN['GSO'] = None # To be determined later on, based on data
+    modelGLGNN['order'] = None # To be determined next
+    # Coarsening
+    #modelGLGNN['coarsening'] = False
+    
+    #\\\ TRAINER
+
+    modelGLGNN['trainer'] = training.Trainer
+    
+    #\\\ HPARAMS
+    multipliers = { "lambda" : [0.0, 0.005], #Frob
+                    "gamma" :  [0.0, 0.03], #Log-B
+                    "beta" :   [5e-5, 0.0], #TV
+                    "eta" :    [5e-3, 6e-3]} # Enc-Dec
+    print(multipliers)
+
+    #\\\ EVALUATOR
+    
+    modelGLGNN['evaluator'] = evaluation.evaluate    
+    writeVarValues(varsFile, modelGLGNN)
+    modelList += [modelGLGNN['name']]
+    
+
 #\\\\\\\\\\\\\\\\\\\\\
 #\\\ SELECTION GNN \\\
 #\\\\\\\\\\\\\\\\\\\\\
@@ -876,6 +929,7 @@ for graph in range(nGraphRealizations):
             thisDevice = modelDict.pop('device')
             thisTrainer = modelDict.pop('trainer')
             thisEvaluator = modelDict.pop('evaluator')
+            thisBaseModel =  modelDict.pop('baseModel')
             
             # If more than one graph or data realization is going to be 
             # carried out, we are going to store all of thos models
@@ -917,8 +971,8 @@ for graph in range(nGraphRealizations):
             ################
             # ARCHITECTURE #
             ################
-    
-            thisArchit = callArchit(**modelDict)
+            
+            thisArchit = callArchit(thisBaseModel)(**modelDict)
             
             #############
             # OPTIMIZER #

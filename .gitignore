@@ -7,3 +7,4 @@ datasets/*
 */*/__pycache__
 */__Pycache__
 __pycache__
+lightning_logs/

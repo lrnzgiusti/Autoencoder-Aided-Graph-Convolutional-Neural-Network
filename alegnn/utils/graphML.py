@@ -3009,7 +3009,7 @@ class GraphAttentional(nn.Module):
     """
 
     def __init__(self, G, F, K, E = 1,
-        nonlinearity = nn.functional.relu, concatenate = True):
+        nonlinearity = nn.functional.relu, concatenate = False):
         # K: Number of filter taps
         # GSOs will be added later.
         # This combines both weight scalars and weight vectors.
