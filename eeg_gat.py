@@ -25,6 +25,7 @@ import numpy as np
 import alegnn.utils.graphTools as graphTools
 import alegnn.utils.graphML as gml
 import alegnn.modules.architectures as archit
+from alegnn.modules.loss import MultiGraphLearningLoss
 
 
 
@@ -39,8 +40,8 @@ class Dataset(torch.utils.data.Dataset):
         
     def __getitem__(self, index):
         # Returns (xb, yb) pair
-        #idxs = torch.randint(0, 7488, (512,))
-        X  = self.eeg[index]#[:,idxs]
+        idxs = torch.randint(0, 7488, (256,))
+        X  = self.eeg[index][:,idxs]
         y =  self.y[index]
        
         return X, y
@@ -83,7 +84,7 @@ class eeg_GAT(pl.LightningModule):
         #modelGLGNN['archit'] = archit.adaptiveGraphLearnGNN
         baseModel =  archit.GraphAttentionNetwork if att else archit.SelectionGNN 
         # Graph convolutional layers
-        modelGLGNN['dimNodeSignals'] = [100, 32, 32] # Number of features per layer
+        modelGLGNN['dimNodeSignals'] = [16, 8, 8] # Number of features per layer
         if att:
             modelGLGNN['nAttentionHeads'] = [3,3]
         else:
@@ -92,7 +93,7 @@ class eeg_GAT(pl.LightningModule):
         # Nonlinearity
         modelGLGNN['nonlinearity'] = nn.ReLU if not att else torch.nn.functional.relu
         # Pooling
-        modelGLGNN['nSelectedNodes'] = [32, 32] # Number of nodes to keep
+        modelGLGNN['nSelectedNodes'] = [32, 32] # Number of nodes to keep se il secondo diventa 8 scoppia
         modelGLGNN['poolingFunction'] = gml.TransformerPool # Summarizing function
         modelGLGNN['poolingSize'] = [6, 8] # Summarizing neighborhoods
         # Readout layer
@@ -101,36 +102,40 @@ class eeg_GAT(pl.LightningModule):
         modelGLGNN['GSO'] = S # To be determined later on, based on data
         modelGLGNN['order'] = None # To be determined next
         # Coarsening
-        self.transformer = nn.Transformer(d_model=7488, 
+        self.transformer = nn.Transformer(d_model=256, 
                                            nhead=1, 
                                            num_encoder_layers=1, 
                                            num_decoder_layers=1, 
-                                           dim_feedforward=100, 
+                                           dim_feedforward=16, 
                                            batch_first=True).to("cpu")
 
         
         
-        self.loss = nn.MSELoss()
-        
+   
         #modelGLGNN['coarsening'] = False
         
         #\\\ TRAINER
 
         
         #\\\ HPARAMS
-        multipliers = { "lambda" : [0.0, 0.005], #Frob
-                        "gamma" :  [0.0, 0.03], #Log-B
-                        "beta" :   [5e-5, 0.0], #TV
-                        "eta" :    [5e-3, 6e-3]} # Enc-Dec
+        multipliers = { "lambda" : [0.005, 0.005], #Frob
+                        "gamma" :  [0.03, 0.03], #Log-B
+                        "beta" :   [5e-5, 5e-5], #TV
+                        "eta" :    [5e-4, 6e-4]} # Enc-Dec
         self.attention = att
         
-        self.arch = archit.adaptiveGraphLearnGNN(baseModel)(**modelGLGNN).to("cpu")
+        self.arch = archit.adaptiveGraphLearnGNN(baseModel)(learn_first=True, **modelGLGNN).to("cpu")
+        self.loss = MultiGraphLearningLoss(nn.L1Loss, self.arch.S, 
+                                        self.arch.signals,
+                                        self.arch.enc_dec_errors,
+                                        multipliers)
         
     def forward(self, x):
         activation = self.transformer.encoder.layers[0].linear1(x)
         code = torch.relu(activation)
         code = code.permute(0,2,1)
-        out = torch.relu(self.arch(code))
+        T = self.arch(code)
+        out = T*((T>=0) & (T<=100))
         
         return  out
     
@@ -138,11 +143,9 @@ class eeg_GAT(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
-        print(y_hat)
         loss = self.loss(y_hat, y)
-        
-        
-        
+        if torch.rand(1) > .5:
+            self.loss.eval_penalties()
         self.log('train_loss', loss.item(), on_step=True, on_epoch=True)
         return loss
     
@@ -162,11 +165,11 @@ class eeg_GAT(pl.LightningModule):
   
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-2, weight_decay=1e-6)
+        optimizer = torch.optim.Adam(self.parameters(), lr=5e-3, weight_decay=1e-6)
         return optimizer
     
     
-net = eeg_GAT(np.eye(32))
+net = eeg_GAT(np.ones((32,32)))
     
 
 
@@ -175,7 +178,7 @@ val_data = Dataset( )
 
 train_loader = \
     torch.utils.data.DataLoader(train_data, batch_size=10, batch_sampler=None, shuffle=False)
-val_loader = torch.utils.data.DataLoader(val_data, batch_size=10, batch_sampler=None, shuffle=False)
+val_loader = torch.utils.data.DataLoader(val_data, batch_size=1, batch_sampler=None, shuffle=False)
 
 logger = pl.loggers.TensorBoardLogger(name=r'1', save_dir='lightning_logs')
 
@@ -184,6 +187,16 @@ pl.seed_everything(0)
 
 
 
-trainer = pl.Trainer(max_epochs=25, logger=logger)
+trainer = pl.Trainer(max_epochs=10, logger=logger)
 trainer.fit(net, train_loader, val_loader)
 
+
+s0 = net.arch.S[0]
+s1 = net.arch.S[1]
+s0 = s0[0]
+s1 = s1[0]
+import networkx as nx
+G = nx.from_numpy_array(s0.numpy())
+nx.draw(G)
+G = nx.from_numpy_array(s1.numpy())
+nx.draw(G)

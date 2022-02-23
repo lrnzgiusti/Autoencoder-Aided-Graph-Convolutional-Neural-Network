@@ -490,7 +490,7 @@ def adaptiveGraphLearnGNN(base):
         GraphLearnGNN: extends the concept of SelectionGNN by
                        learning the hidden graphs structure
         """
-        def __init__(self, **kwargs):
+        def __init__(self, learn_first=1, **kwargs):
             
             # Call the constructor of SelectionGNN without the coarsening
             super().__init__(**kwargs)
@@ -498,13 +498,15 @@ def adaptiveGraphLearnGNN(base):
             #set the hidden graphs to have the right dimensions for avoid padding
             #this shifts will be learned during the training
             #the first layer is skipped since we learn only the hidden ones
+            
+            U = torch.distributions.uniform.Uniform(0, 1)
             sel = "Sel" in str(base)
             self.alphas = [] #list of alpha associated to the GSO's
             self.constants = [] #list of constant used for handling the alpha<=>A
             self.S = [self.S] #list of shifts
             self.signals = []
             self.enc_dec_errors = []
-            U = torch.distributions.uniform.Uniform(0, 1)
+            self.N = self.N[1:]
             for l in range(1, self.L):
                 #init with a graph that does not exchange information with neighbors
                 #We will change this during experiments
@@ -521,7 +523,7 @@ def adaptiveGraphLearnGNN(base):
                     #finally set the GSO as the last shift of the architecture
                     self.GFL[3*l].addGSO(self.S[-1])
                     #recompute the shift before the forward
-                    self.GFL[3*l].register_forward_pre_hook(self.rebuild_shift(l))
+                    #self.GFL[3*l].register_forward_pre_hook(self.rebuild_shift(l))
                     #register forward hook for computing the GLloss
                     #the signals are taken as the output of the nonlinearity
                     self.GFL[3*l-1].register_forward_hook(self.get_activation()) #first layer signal
@@ -529,7 +531,6 @@ def adaptiveGraphLearnGNN(base):
                     self.GFL[3*l+2].register_forward_hook(self.get_enc_dec_error()) #second autoencoder erros
                     
                 else:
-                    self.GAT[l+1].register_forward_pre_hook(self.rebuild_shift(l))
                     self.GAT[l+1].register_forward_hook(self.get_activation())
                     self.GAT[l].register_forward_hook(self.get_enc_dec_error())
                     self.GAT[l+2].register_forward_hook(self.get_enc_dec_error())
@@ -537,6 +538,10 @@ def adaptiveGraphLearnGNN(base):
                 #the vector alpha which is the vector w.r.t we compute the gradient
                 #we put the into the range(1, self.L) 'cause we keep the first
                 #GSO fixed
+            
+            start = 0 if learn_first else 1
+            
+            for l in range(start, self.L):
                 #the constants will handle the GSO and alpha manipulation
                 constant = glt.Constants(self.N[l])
                 #alpha is computed as Elim x vec(S) and is shaped as [(NxN+1)/2,1]
@@ -548,6 +553,10 @@ def adaptiveGraphLearnGNN(base):
                                                           self.N[l], self.N[l]]).detach()
                 self.alphas.append(alpha)
                 self.constants.append(constant)
+                if sel:
+                    self.GFL[3*l].register_forward_pre_hook(self.rebuild_shift(l))
+                else:
+                    self.GAT[2*l].register_forward_pre_hook(self.rebuild_shift(l))
             if sel:
                 for l in range(self.L):
                     self.GFL[3*l+1], self.GFL[3*l+2] = self.GFL[3*l+2], self.GFL[3*l+1]
@@ -559,9 +568,9 @@ def adaptiveGraphLearnGNN(base):
             #Since the first shift is fixed, at index 'layer-1' we have the 
             #constants and alpha for layer indexded 'layer'
             def hook(model, input):
-                D = self.constants[layer-1].D.to(self.device)
-                self.alphas[layer-1] = self.alphas[layer-1].to(self.device)
-                self.S[layer] = (D @ self.alphas[layer-1]).reshape([self.E, 
+                D = self.constants[layer].D.to(self.device)
+                self.alphas[layer] = self.alphas[layer].to(self.device)
+                self.S[layer] = (D @ self.alphas[layer]).reshape([self.E, 
                                                      self.N[layer], self.N[layer]]).to(self.device)
                 if self.base:
                     self.GFL[3*layer].addGSO(self.S[layer])

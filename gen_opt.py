@@ -213,7 +213,7 @@ doSelectionGNN = False
 doAggregationGNN = False
 doMultinodeGNN = False
 doGraphLearnGNN = False
-doMeganFox = True
+doTransformer = True
 # In this section, we determine the (hyper)parameters of models that we are
 # going to train. This only sets the parameters. The architectures need to be
 # created later below. Do not forget to add the name of the architecture
@@ -282,7 +282,7 @@ if doGraphLearnGNN:
     modelList += [modelGLGNN['name']]
     
 attention = True
-if doMeganFox:
+if doTransformer:
     modelGLGNN = {}
     modelGLGNN['name'] = 'GLGNN' # To be modified later on depending on the
         # specific ordering selected
